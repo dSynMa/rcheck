@@ -1,0 +1,15 @@
+{
+    "projectName": "RCheck",
+    "languages": [{
+        "id": "r-check",
+        "grammar": "src/language/r-check.langium",
+        "fileExtensions": [".rcp"],
+        "textMate": {
+            "out": "syntaxes/r-check.tmLanguage.json"
+        },
+        "monarch": {
+            "out": "syntaxes/r-check.monarch.ts"
+        }
+    }],
+    "out": "src/language/generated"
+}
