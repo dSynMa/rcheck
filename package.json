@@ -18,6 +18,7 @@
         "build:monarch": "tsc -b tsconfig.monarch.json",
         "build:bundle": "vite --config ./vite.bundle.config.ts build",
         "build:worker": "esbuild --minify ./out/language/main-browser.js --bundle --format=iife --outfile=./static/worker/r-check-server-worker.js",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
         "dev": "vite",
         "dev:debug": "vite --debug --force",
         "serve": "npm run dev"
