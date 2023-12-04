@@ -41,6 +41,7 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
             }
             scopes.addAll(guard, localDescriptions);
         }
+
         for (const agent of model.agents) {
             const localDescriptions: AstNodeDescription[] = [];
             for (const local of agent.locals){
@@ -48,8 +49,13 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
                 localDescriptions.push(descr);
             }
             scopes.addAll(agent, localDescriptions);
+            for (const instance of model.system) {
+                if (instance.agent.$refText == agent.name) {
+                    scopes.addAll(instance, localDescriptions);
+                }
+            }
         }
-        
+
         return scopes;
     }
 }

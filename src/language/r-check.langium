@@ -15,7 +15,7 @@ entry Model:
     // TODO specs
     ;
 
-Instance: agent=[Agent] '(' name=ID ',' Expr ')';
+Instance: agent=[Agent] '(' name=ID ',' init=Expr ')';
 Enum:
     'enum' name=ID '{' cases+=Case (',' cases+=Case)* '}';
 
