@@ -1,7 +1,58 @@
-import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, Module, PartialLangiumServices } from 'langium';
-import { createDefaultModule, createDefaultSharedModule, inject } from 'langium';
+import type { AstNode, AstNodeDescription, DefaultSharedModuleContext, LangiumDocument, LangiumServices, LangiumSharedServices, Module, PartialLangiumServices, PrecomputedScopes } from 'langium';
+import { DefaultScopeComputation, createDefaultModule, createDefaultSharedModule, inject, streamAllContents } from 'langium';
+import { CancellationToken } from 'vscode-languageserver';
+import { Enum, Model, isEnum } from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
+
+export class RCheckScopeComputation extends DefaultScopeComputation {
+    constructor(services: LangiumServices) {
+        super(services);
+    }
+
+    override async computeExports(document: LangiumDocument): Promise<AstNodeDescription[]> {
+        const exportedDescriptions: AstNodeDescription[] = [];
+        for (const childNode of streamAllContents(document.parseResult.value)) {
+            if (isEnum(childNode)) {
+                const enumNode: Enum = childNode as Enum;
+                for(const caseNode of enumNode.cases){
+                    exportedDescriptions.push(this.descriptions.createDescription(caseNode, caseNode.name, document));
+
+                }
+                // `descriptions` is our `AstNodeDescriptionProvider` defined in `DefaultScopeComputation`
+                // It allows us to easily create descriptions that point to elements using a name.
+            }
+        }
+        return exportedDescriptions;
+    }
+
+    override async computeLocalScopes(document: LangiumDocument<AstNode>, cancelToken?: CancellationToken | undefined): Promise<PrecomputedScopes> {
+        
+        const scopes = await super.computeLocalScopes(document, cancelToken);
+        const model = document.parseResult.value as Model;
+        // This map stores a list of descriptions for each node in our document
+        
+        // Make param names available within guard
+        for (const guard of model.guards) {
+            const localDescriptions: AstNodeDescription[] = [];
+            for (const param of guard.params){
+                const descr = this.descriptions.createDescription(param, param.name, document);
+                localDescriptions.push(descr);
+            }
+            scopes.addAll(guard, localDescriptions);
+        }
+        for (const agent of model.agents) {
+            const localDescriptions: AstNodeDescription[] = [];
+            for (const local of agent.locals){
+                const descr = this.descriptions.createDescription(local, local.name, document);
+                localDescriptions.push(descr);
+            }
+            scopes.addAll(agent, localDescriptions);
+        }
+        
+        return scopes;
+    }
+}
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -26,6 +77,9 @@ export type RCheckServices = LangiumServices & RCheckAddedServices
 export const RCheckModule: Module<RCheckServices, PartialLangiumServices & RCheckAddedServices> = {
     validation: {
         RCheckValidator: () => new RCheckValidator()
+    },
+    references : {
+        ScopeComputation : (services) => new RCheckScopeComputation(services)
     }
 };
 
