@@ -1,7 +1,7 @@
 import type { AstNode, AstNodeDescription, DefaultSharedModuleContext, LangiumDocument, LangiumServices, LangiumSharedServices, Module, PartialLangiumServices, PrecomputedScopes } from 'langium';
-import { DefaultScopeComputation, createDefaultModule, createDefaultSharedModule, inject, streamAllContents } from 'langium';
+import { DefaultScopeComputation, createDefaultModule, createDefaultSharedModule, inject, streamAllContents, streamAst } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Enum, Model, isEnum } from './generated/ast.js';
+import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommand, Command } from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
 
@@ -42,19 +42,52 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
             scopes.addAll(guard, localDescriptions);
         }
 
+        let agentMap = new Map<string, AstNodeDescription[]>;
+        let instanceMap = new Map<string, string>;
+        // const labelDescriptions: AstNodeDescription[] = [];
+
         for (const agent of model.agents) {
             const localDescriptions: AstNodeDescription[] = [];
+            // Create descriptions for labels
+            for (const child of streamAst(agent.repeat)) {
+                if (isCommand(child)) {
+                    const cmd = child as Command;
+                    if (cmd.name !== undefined) {
+                        const descr = this.descriptions.createDescription(cmd, cmd.name, document);
+                        localDescriptions.push(descr);
+                    }
+                }
+            }
+            // Create descriptions for local variables
             for (const local of agent.locals){
                 const descr = this.descriptions.createDescription(local, local.name, document);
                 localDescriptions.push(descr);
             }
+            agentMap.set(agent.name, localDescriptions);
             scopes.addAll(agent, localDescriptions);
-            for (const instance of model.system) {
-                if (instance.agent.$refText == agent.name) {
-                    scopes.addAll(instance, localDescriptions);
+        }
+        // Export local variables to instance init
+        for (const instance of model.system) {
+            if (agentMap.has(instance.agent.$refText)) {
+                instanceMap.set(instance.name, instance.agent.$refText);
+                scopes.addAll(instance, agentMap.get(instance.agent.$refText)!);
+            }
+        }
+
+        // Export labels and local variables to qualified references in LTOL
+        for (const spec of model.specs) {
+            // scopes.addAll(spec, labelDescriptions);
+            for (const child of streamAllContents(spec)) {
+                if (isQualifiedRef(child)) {
+                    const qref = child as QualifiedRef;
+                    if (instanceMap.has(qref.instance.$refText)){
+                        const agentName = instanceMap.get(qref.instance.$refText)!;
+                        scopes.addAll(child, agentMap.get(agentName)!);
+                    }
                 }
             }
         }
+
 
         return scopes;
     }

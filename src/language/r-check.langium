@@ -12,7 +12,8 @@ entry Model:
     //Agents and instantiation
     (agents+=Agent)*
     'system' '=' (system+=Instance ('|' system+=Instance)*)
-    // TODO specs
+    // Specs
+    ('SPEC' specs+=Ltol ';')*
     ;
 
 Instance: agent=[Agent] '(' name=ID ',' init=Expr ')';
@@ -28,7 +29,7 @@ Agent:
     'agent' name=ID
     (
         ('local' ':' (locals+=Local (',' locals+=Local)*  ))
-        | ('init' ':' Expr)
+        | ('init' ':' init=Expr)
         | ('relabel' ':' (relabels+=Relabel)+)
         | ('receive-guard' ':' Expr)
     )*
@@ -49,16 +50,16 @@ BaseProcess infers Process:
     Send | Receive | '(' Process ')' | {infer Rep} 'rep' Process;
 
 fragment CmdHeader:
-    (label=ID ':')? '{' psi=Expr '}' chanExpr=ChannelExpr;
+    (name=ID ':')? '{' psi=Expr '}' chanExpr=ChannelExpr;
 
 Send infers Process: 
-    CmdHeader '!' 
+    {infer Command} CmdHeader '!' 
     sendGuard=Expr
     '(' (data+=Assign (',' data+=Assign)*)? ')'
     '[' (update+=Assign (',' update+=Assign)*)? ']';
 
 Receive infers Process: 
-    CmdHeader '?'
+    {infer Command} CmdHeader '?'
     '[' (update+=Assign (',' update+=Assign)*)? ']';
 
 Assign: left=[TypedDecl] ':=' right=Expr;
@@ -70,6 +71,8 @@ fragment TypedDeclaration:
 
 fragment Params:
     params+=Param (',' params+=Param)* ;
+
+Target: Local | Channel | Param | MsgStruct | CommVar | Send | Receive;
 
 Local infers TypedDecl: TypedDeclaration;
 Channel infers TypedDecl: name=ID;
@@ -83,7 +86,7 @@ Compound infers Expr:
     left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'&&'|'||') right=Comparison)*;
 
 Comparison infers Expr:
-    left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'=='|'!=') right=AddSub)?;
+    left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'=='|'!='|'=') right=AddSub)?;
 
 AddSub infers Expr:
     MulDiv ({infer BinExpr.left=current} operator=('+' | '-') right=MulDiv)*;
@@ -93,6 +96,8 @@ MulDiv infers Expr:
 
 BaseExpr infers Expr:
     '(' Expr ')'
+    | {infer AutomatonState} instance=[Instance] '-automaton-state'
+    | {infer QualifiedRef} instance=[Instance] '-' variable=[Target]
     | {infer Ref} variable=[TypedDecl]
     | {infer CommVarRef} '@' variable=[TypedDecl]
     | {infer UMinus} '-' expr=BaseExpr
@@ -102,6 +107,31 @@ BaseExpr infers Expr:
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('TRUE' | 'FALSE'| 'true'|'false')
     | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
+    ;
+
+Ltol: LtolCompound;
+
+LtolCompound infers Ltol:
+    LtolMod ({infer BinLtol.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'<->') right=LtolMod)*;
+
+LtolMod infers Ltol:
+    LtolBase ({infer BinLtol.left=current} operator=('U'|'R'|'W') right=LtolBase)*
+    | {infer Finally} 'F' phi=LtolBase
+    | {infer Globally} 'G' phi=LtolBase
+    | {infer Next} 'X' phi=LtolBase
+    ;
+
+LtolBase infers Ltol:
+    {infer Diamond} '<' obs=Obs '>' phi=Ltol
+    | {infer Box} '[' obs=Obs ']' phi=Ltol
+    | {infer Predicate} Expr
+    | '(' Ltol ')'
+    ;
+
+Obs:
+    {infer LiteralObs} value=('TRUE' | 'FALSE'| 'true'|'false')
+    | {infer ChannelObs} 'channel' '==' name=ID
+    | {infer SenderObs} 'sender' '==' name=ID
     ;
 
 
