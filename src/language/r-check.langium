@@ -9,8 +9,10 @@ entry Model:
         | ('communication-variables' ':' commVars+=CommVar (',' commVars+=CommVar)*)
         | guards+=Guard
     )*
+    //Agents and instantiation
     (agents+=Agent)*
-    'system' '=' (system+=Instance ('|' system+=Instance))
+    'system' '=' (system+=Instance ('|' system+=Instance)*)
+    // TODO specs
     ;
 
 Instance: agent=[Agent] '(' name=ID ',' Expr ')';
@@ -25,7 +27,7 @@ Guard:
 Agent:
     'agent' name=ID
     (
-        ('local' ':' (locals+=Local (',' locals+=Local)  ))
+        ('local' ':' (locals+=Local (',' locals+=Local)*  ))
         | ('init' ':' Expr)
         | ('relabel' ':' (relabels+=Relabel)+)
         | ('receive-guard' ':' Expr)
@@ -38,23 +40,26 @@ Relabel: var=[TypedDecl] '<-' Expr;
 Process: Choice;
 
 Choice infers Process: 
-    left=Sequence ({infer BinProcess.left=current} '+' right=Sequence);
+    left=Sequence ({infer BinProcess.left=current} '+' right=Sequence)*;
 
 Sequence infers Process:
-    left=BaseProcess ({infer BinProcess.left=current} ';' right=BaseProcess);
+    left=BaseProcess ({infer BinProcess.left=current} ';' right=BaseProcess)*;
 
 BaseProcess infers Process: 
     Send | Receive | '(' Process ')' | {infer Rep} 'rep' Process;
 
+fragment CmdHeader:
+    (label=ID ':')? '<' psi=Expr '>' chanExpr=ChannelExpr;
+
 Send infers Process: 
-    (label=ID ':')? '<' psi=Expr '>' chanExpr=ChannelExpr '!' 
+    CmdHeader '!' 
     sendGuard=Expr
     '(' (data+=Assign (',' data+=Assign)*)? ')'
     '[' (update+=Assign (',' update+=Assign)*)? ']';
 
 Receive infers Process: 
-    (label=ID ':')? '<' psi=Expr '>' chanExpr=ChannelExpr '?'
-    '[' update+=Assign (',' update+=Assign)* ']';
+    CmdHeader '?'
+    '[' (update+=Assign (',' update+=Assign)*)? ']';
 
 Assign: left=[TypedDecl] ':=' right=Expr;
 
@@ -88,9 +93,6 @@ MulDiv infers Expr:
 
 BaseExpr infers Expr:
     '(' Expr ')'
-    // | {infer ParamRef} param=[Param]
-    // | {infer MsgRef} msg=[MsgStruct]
-    // | {infer CaseRef} case=[Case]
     | {infer Ref} variable=[TypedDecl]
     | {infer CommVarRef} '@' variable=[TypedDecl]
     | {infer UMinus} '-' expr=BaseExpr
@@ -99,8 +101,8 @@ BaseExpr infers Expr:
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('TRUE' | 'FALSE'| 'true'|'false')
+    | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
     ;
-    //| {infer guardCall} guard=[Guard] '(' (Expr (',' Expr)*)? ')';
 
 
 hidden terminal WS: /\s+/;
