@@ -49,7 +49,7 @@ BaseProcess infers Process:
     Send | Receive | '(' Process ')' | {infer Rep} 'rep' Process;
 
 fragment CmdHeader:
-    (label=ID ':')? '<' psi=Expr '>' chanExpr=ChannelExpr;
+    (label=ID ':')? '{' psi=Expr '}' chanExpr=ChannelExpr;
 
 Send infers Process: 
     CmdHeader '!' 
