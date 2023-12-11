@@ -20,7 +20,7 @@ Instance: agent=[Agent] '(' name=ID ',' init=Expr ')';
 Enum:
     'enum' name=ID '{' cases+=Case (',' cases+=Case)* '}';
 
-Case infers TypedDecl: name=ID;
+Case: name=ID;
 
 Guard:
     'guard' name=ID '(' Params? ')' ':=' Expr ';';
@@ -36,7 +36,7 @@ Agent:
     'repeat' ':' repeat=Process
     ;
 
-Relabel: var=[TypedDecl] '<-' Expr;
+Relabel: var=[CommVar] '<-' Expr;
 
 Process: Choice;
 
@@ -47,24 +47,27 @@ Sequence infers Process:
     left=BaseProcess ({infer BinProcess.left=current} ';' right=BaseProcess)*;
 
 BaseProcess infers Process: 
-    Send | Receive | '(' Process ')' | {infer Rep} 'rep' Process;
+    Send | Receive | Get | Supply | '(' Process ')' | {infer Rep} 'rep' Process;
 
-fragment CmdHeader:
-    (name=ID ':')? '{' psi=Expr '}' chanExpr=ChannelExpr;
+fragment CmdHeader: (name=ID ':')? '{' psi=Expr '}';
+fragment Update: '[' (update+=Assign (',' update+=Assign)*)? ']';
+fragment Data: '(' (data+=Assign (',' data+=Assign)*)? ')';
 
 Send infers Process: 
-    {infer Command} CmdHeader '!' 
-    sendGuard=Expr
-    '(' (data+=Assign (',' data+=Assign)*)? ')'
-    '[' (update+=Assign (',' update+=Assign)*)? ']';
-
+    CmdHeader chanExpr=ChannelExpr '!' sendGuard=Expr Data Update;
 Receive infers Process: 
-    {infer Command} CmdHeader '?'
-    '[' (update+=Assign (',' update+=Assign)*)? ']';
+    CmdHeader chanExpr=ChannelExpr '?' Update;
+Get infers Process: 
+    CmdHeader 'GET@' '(' where=Expr ')' Update ;
+Supply infers Process: 
+    CmdHeader 'SUPPLY@' '(' where=Expr ')' Data Update ;
 
-Assign: left=[TypedDecl] ':=' right=Expr;
+Command: Get|Supply|Send|Receive;
 
-ChannelExpr: expr=(ID|"*");
+Assign: left=[Target] ':=' right=Expr;
+
+ChannelExprRef: Channel | Local;
+ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
 
 fragment TypedDeclaration: 
     name=ID ':' (builtinType=('bool'|'int'|'channel') | customType=[Enum]);
@@ -72,13 +75,13 @@ fragment TypedDeclaration:
 fragment Params:
     params+=Param (',' params+=Param)* ;
 
-Target: Local | Channel | Param | MsgStruct | CommVar | Send | Receive;
+Target: Local | Channel | Case | Param | MsgStruct | CommVar | Command | Instance;
 
-Local infers TypedDecl: TypedDeclaration;
-Channel infers TypedDecl: name=ID;
-Param infers TypedDecl: TypedDeclaration;
-MsgStruct infers TypedDecl: TypedDeclaration;
-CommVar infers TypedDecl: TypedDeclaration;
+Local: TypedDeclaration;
+Channel: name=ID;
+Param: TypedDeclaration;
+MsgStruct: TypedDeclaration;
+CommVar: TypedDeclaration;
 
 Expr: Compound;
 
@@ -98,11 +101,12 @@ BaseExpr infers Expr:
     '(' Expr ')'
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
     | {infer QualifiedRef} instance=[Instance] '-' variable=[Target]
-    | {infer Ref} variable=[TypedDecl]
-    | {infer CommVarRef} '@' variable=[TypedDecl]
+    | {infer Ref} variable=[Target]
+    | {infer CommVarRef} '@' variable=[CommVar]
     | {infer UMinus} '-' expr=BaseExpr
     | {infer Neg} '!' expr=BaseExpr
     | {infer Ref} currentChannel='channel'
+    | {infer Self} name='SELF'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('TRUE' | 'FALSE'| 'true'|'false')
