@@ -1,7 +1,7 @@
 import type { AstNode, AstNodeDescription, DefaultSharedModuleContext, LangiumDocument, LangiumServices, LangiumSharedServices, Module, PartialLangiumServices, PrecomputedScopes } from 'langium';
 import { DefaultScopeComputation, createDefaultModule, createDefaultSharedModule, inject, streamAllContents, streamAst } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommand, Command } from './generated/ast.js';
+import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommand, Command, isCommVar } from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
 
@@ -13,14 +13,17 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
     override async computeExports(document: LangiumDocument): Promise<AstNodeDescription[]> {
         const exportedDescriptions: AstNodeDescription[] = [];
         for (const childNode of streamAllContents(document.parseResult.value)) {
+            // Export enum cases globally
             if (isEnum(childNode)) {
                 const enumNode: Enum = childNode as Enum;
                 for(const caseNode of enumNode.cases){
                     exportedDescriptions.push(this.descriptions.createDescription(caseNode, caseNode.name, document));
 
                 }
-                // `descriptions` is our `AstNodeDescriptionProvider` defined in `DefaultScopeComputation`
-                // It allows us to easily create descriptions that point to elements using a name.
+            }
+            // Export @-prefixed names for property identifiers
+            if (isCommVar(childNode)) {
+                exportedDescriptions.push(this.descriptions.createDescription(childNode, "@" + childNode.name, document))
             }
         }
         return exportedDescriptions;

@@ -102,7 +102,7 @@ BaseExpr infers Expr:
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
     | {infer QualifiedRef} instance=[Instance] '-' variable=[Target]
     | {infer Ref} variable=[Target]
-    | {infer CommVarRef} '@' variable=[CommVar]
+    | {infer CommVarRef} variable=[CommVar:CV]
     | {infer UMinus} '-' expr=BaseExpr
     | {infer Neg} '!' expr=BaseExpr
     | {infer Ref} currentChannel='channel'
@@ -140,6 +140,7 @@ Obs:
 
 
 hidden terminal WS: /\s+/;
+terminal CV: /@([_a-zA-Z][\w_]*)/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal INT returns number: /[0-9]+/;
 terminal STRING: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
