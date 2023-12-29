@@ -1,0 +1,18 @@
+channels: chan
+enum msgvals {team, form, assemble}
+message-structure: MSG : msgvals, NO : int, LNK : channel
+
+agent Agent
+    local: counter : int
+    init: counter == 0
+
+    repeat: (
+                {counter == 0} chan! TRUE () [counter := 1];
+                {counter == 1} chan! TRUE () [counter := 0]
+            )
+
+system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
+
+SPEC \/ k : Agent . F TRUE;
+SPEC /\ k : Agent . F TRUE;
+SPEC F TRUE;
