@@ -70,7 +70,9 @@ ChannelExprRef: Channel | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
 
 fragment TypedDeclaration: 
-    name=ID ':' (builtinType=('bool'|'int'|'channel') | customType=[Enum]);
+    name=ID ':' (builtinType=('bool'|'int'|'channel') | customType=[Enum] | rangeType=Range);
+
+Range: lower=INT '..' upper=INT;
 
 fragment Params:
     params+=Param (',' params+=Param)* ;
@@ -86,7 +88,7 @@ CommVar: TypedDeclaration;
 Expr: Compound;
 
 Compound infers Expr:
-    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'&&'|'||') right=Comparison)*;
+    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'&&'|'||'|'->') right=Comparison)*;
 
 Comparison infers Expr:
     left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'=='|'!='|'=') right=AddSub)?;
@@ -113,7 +115,10 @@ BaseExpr infers Expr:
     | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
     ;
 
-Ltol: LtolCompound;
+Ltol: LtolQuantified | LtolCompound;
+
+LtolQuantified infers Ltol:
+    quant=(BIGAND|BIGOR) name=ID ':' kind=ID '.' LtolCompound;
 
 LtolCompound infers Ltol:
     LtolMod ({infer BinLtol.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'<->') right=LtolMod)*;
@@ -128,7 +133,7 @@ LtolMod infers Ltol:
 LtolBase infers Ltol:
     {infer Diamond} '<' obs=Obs '>' phi=Ltol
     | {infer Box} '[' obs=Obs ']' phi=Ltol
-    | {infer Predicate} Expr
+    | {infer Predicate} pred=Expr
     | '(' Ltol ')'
     ;
 
@@ -140,6 +145,8 @@ Obs:
 
 
 hidden terminal WS: /\s+/;
+terminal BIGAND: /\/\\/;
+terminal BIGOR: /\\\//;
 terminal CV: /@([_a-zA-Z][\w_]*)/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal INT returns number: /[0-9]+/;
