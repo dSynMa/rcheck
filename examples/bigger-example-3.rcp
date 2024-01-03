@@ -82,7 +82,7 @@ SPEC G (client-sReserve -> X client-sRequest);
 SPEC G (client-sReserve -> F client-sRelease);
 SPEC G (client-sRequest -> F client-rConnect);
 SPEC G (manager-sForward -> X machine-rForward);
-SPEC G ((!machine-asgn & machine-rForward)-> machine-sConnect);
+SPEC G ((!machine-asgn & machine-rForward) -> machine-sConnect);
 SPEC G (client-sRelease -> F (!client-rConnect));
 SPEC G (client-automaton-state=4 -> !client-rConnect);
 SPEC F (client-sRelease -> G(!client-rConnect));

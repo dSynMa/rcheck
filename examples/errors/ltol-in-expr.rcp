@@ -1,0 +1,16 @@
+channels: chan
+guard g(p : int) := p == (F 3) U false;
+guard g2() := true;
+
+agent Agent
+    local: counter : int
+    init: counter == 0 U counter == 1
+
+    repeat: (
+                {counter == G 0} chan! TRUE () [counter := 1 U true];
+                {F counter == 1} chan! TRUE () [counter := X 0]
+            )
+
+system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
+
+SPEC F TRUE;

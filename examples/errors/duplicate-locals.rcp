@@ -3,7 +3,7 @@ enum msgvals {team, form, assemble}
 message-structure: MSG : msgvals, NO : int, LNK : channel
 
 agent Agent
-    local: counter : int
+    local: counter : int, counter: bool
     init: counter == 0
 
     repeat: (
@@ -12,7 +12,3 @@ agent Agent
             )
 
 system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
-
-SPEC \/ k : Agent . F TRUE;
-SPEC /\ k : Agent . F TRUE;
-SPEC F TRUE;
