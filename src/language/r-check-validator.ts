@@ -9,7 +9,7 @@ export function registerValidationChecks(services: RCheckServices) {
     const registry = services.validation.ValidationRegistry;
     const validator = services.validation.RCheckValidator;
     const checks: ValidationChecks<RCheckAstType> = {
-        Model: validator.checkQuantifiedLtol,
+        Model: validator.checkModel,
         Agent: validator.checkAgent
     };
     registry.register(checks, validator);
@@ -29,11 +29,12 @@ export class RCheckValidator {
         });
     }
 
-    checkQuantifiedLtol(model: Model, accept: ValidationAcceptor): void {
+    checkModel(model: Model, accept: ValidationAcceptor): void {
         if (model.commVars.length == 0) {
-            model.specs.forEach(ltol => {
-                if (ltol.quant != undefined) {
-                    accept("warning", `Quantifier '${ltol.quant}', but system has no property identifiers`, { node: ltol, property: 'quant' });
+            model.specs.forEach(ltol => { 
+                if (ltol.quants !== undefined && ltol.quants.length > 0) {
+                    accept("warning", `Quantified formula, but system has no property identifiers`, { node: ltol });
+                
                 }
             });
         }
