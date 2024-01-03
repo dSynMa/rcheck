@@ -23,7 +23,7 @@ Enum:
 Case: name=ID;
 
 Guard:
-    'guard' name=ID '(' Params? ')' ':=' Expr ';';
+    'guard' name=ID '(' Params? ')' ':=' body=Expr ';';
 
 Agent:
     'agent' name=ID
