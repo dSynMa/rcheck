@@ -47,7 +47,7 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
 
         let agentMap = new Map<string, AstNodeDescription[]>;
         let instanceMap = new Map<string, string>;
-        // const labelDescriptions: AstNodeDescription[] = [];
+        let quantMap = new Map<string, string[]>;
 
         for (const agent of model.agents) {
             const localDescriptions: AstNodeDescription[] = [];
@@ -79,13 +79,26 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
 
         // Export labels and local variables to qualified references in LTOL
         for (const spec of model.specs) {
-            // scopes.addAll(spec, labelDescriptions);
+            // Gather kinds of quantified variables
+            if (spec.quants !== undefined){
+                for (const quant of spec.quants) {
+                    quantMap.set(quant.name, quant.kinds.map(k => k.$refText));
+                }
+            }
+
             for (const child of streamAllContents(spec)) {
                 if (isQualifiedRef(child)) {
                     const qref = child as QualifiedRef;
                     if (instanceMap.has(qref.instance.$refText)){
                         const agentName = instanceMap.get(qref.instance.$refText)!;
                         scopes.addAll(child, agentMap.get(agentName)!);
+                    }
+                    else if (quantMap.has(qref.instance.$refText)) {
+                        const names = quantMap.get(qref.instance.$refText)!;
+                        // let allAgents = [];
+                        for (const agentName of names) {
+                            scopes.addAll(child, agentMap.get(agentName)!);
+                        }
                     }
                 }
             }

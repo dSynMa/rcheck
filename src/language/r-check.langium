@@ -13,7 +13,7 @@ entry Model:
     (agents+=Agent)*
     'system' '=' (system+=Instance ('|' system+=Instance)*)
     // Specs
-    ('SPEC' specs+=Ltol ';')*
+    ('SPEC' specs+=Ltol ';'?)*
     ;
 
 Instance: agent=[Agent] '(' name=ID ',' init=Expr ')';
@@ -88,10 +88,10 @@ CommVar: TypedDeclaration;
 Expr: Compound;
 
 Compound infers Expr:
-    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'&&'|'||'|'->') right=Comparison)*;
+    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'U'|'R'|'W') right=Comparison)*;
 
 Comparison infers Expr:
-    left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'=='|'!='|'=') right=AddSub)?;
+    left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
 
 AddSub infers Expr:
     MulDiv ({infer BinExpr.left=current} operator=('+' | '-') right=MulDiv)*;
@@ -99,10 +99,12 @@ AddSub infers Expr:
 MulDiv infers Expr:
     BaseExpr ({infer BinExpr.left=current} operator=('*' | '/') right=BaseExpr)*;
 
+Qualifier : Instance | LtolQuant;
+
 BaseExpr infers Expr:
     '(' Expr ')'
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
-    | {infer QualifiedRef} instance=[Instance] '-' variable=[Target]
+    | {infer QualifiedRef} instance=[Qualifier] '-' variable=[Target]
     | {infer Ref} variable=[Target]
     | {infer CommVarRef} variable=[CommVar:CV]
     | {infer UMinus} '-' expr=BaseExpr
@@ -113,34 +115,34 @@ BaseExpr infers Expr:
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('TRUE' | 'FALSE'| 'true'|'false')
     | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
+    | {infer LtolMod} LtolMod
+    | {infer LtolBase} LtolBase
     ;
 
-Ltol: LtolQuantified | LtolCompound;
+Ltol: (quants+=LtolQuant)* Expr;
 
-LtolQuantified infers Ltol:
-    quant=(BIGAND|BIGOR) name=ID ':' kind=ID '.' LtolCompound;
-
-LtolCompound infers Ltol:
-    LtolMod ({infer BinLtol.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'<->') right=LtolMod)*;
+LtolQuant: op=(BIGAND|BIGOR) name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
 
 LtolMod infers Ltol:
-    LtolBase ({infer BinLtol.left=current} operator=('U'|'R'|'W') right=LtolBase)*
-    | {infer Finally} 'F' phi=LtolBase
-    | {infer Globally} 'G' phi=LtolBase
-    | {infer Next} 'X' phi=LtolBase
+    {infer Finally} 'F' phi=Expr
+    | {infer Globally} 'G' phi=Expr
+    | {infer Next} 'X' phi=Expr
     ;
 
 LtolBase infers Ltol:
-    {infer Diamond} '<' obs=Obs '>' phi=Ltol
-    | {infer Box} '[' obs=Obs ']' phi=Ltol
-    | {infer Predicate} pred=Expr
-    | '(' Ltol ')'
+    {infer Diamond} '<<' obs=Obs '>>' phi=Expr
+    | {infer Box} '[' obs=Obs ']' phi=Expr
     ;
 
-Obs:
+Obs: CompoundObs;
+CompoundObs infers Obs:
+    BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'<->') right=BaseObs)*;
+
+BaseObs infers Obs:
     {infer LiteralObs} value=('TRUE' | 'FALSE'| 'true'|'false')
-    | {infer ChannelObs} 'channel' '==' name=ID
-    | {infer SenderObs} 'sender' '==' name=ID
+    | {infer ChannelObs} 'channel' ('=='|'=') (chan=ID | chan='*')
+    | {infer SenderObs} 'sender' ('=='|'=') sender=ID
+    | {infer ExprObs} expr=Expr
     ;
 
 
