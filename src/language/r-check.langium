@@ -142,6 +142,8 @@ BaseObs infers Obs:
     {infer LiteralObs} value=('TRUE' | 'FALSE'| 'true'|'false')
     | {infer ChannelObs} 'channel' ('=='|'=') (chan=ID | chan='*')
     | {infer SenderObs} 'sender' ('=='|'=') sender=ID
+    | {infer ForallObs} 'forall' '(' (pred=Expr) ')'
+    | {infer ExistsObs} 'exists' '(' (pred=Expr) ')'
     | {infer ExprObs} expr=Expr
     ;
 
