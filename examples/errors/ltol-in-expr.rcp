@@ -14,3 +14,12 @@ agent Agent
 system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
 
 SPEC F TRUE;
+
+// This example should trigger the following errors:
+//  LTOL not allowed here [Ln 2, Col 21]
+//  LTOL not allowed here [Ln 2, Col 27]
+//  LTOL not allowed here [Ln 7, Col 11]
+//  LTOL not allowed here [Ln 10, Col 29]
+//  LTOL not allowed here [Ln 10, Col 60]
+//  LTOL not allowed here [Ln 11, Col 18]
+//  LTOL not allowed here [Ln 11, Col 60]

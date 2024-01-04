@@ -14,3 +14,7 @@ system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
 SPEC \/ k : Agent . F TRUE;
 SPEC /\ k : Agent . F TRUE;
 SPEC F TRUE;
+
+// This example should trigger the following warnings:
+// Quantified formula, but system has no property identifiers [ln 14, Col 6]
+// Quantified formula, but system has no property identifiers [ln 15, Col 6]
