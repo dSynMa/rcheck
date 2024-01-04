@@ -1,0 +1,28 @@
+channels: chan, chan
+enum msgvals {foo}
+enum msgvals {bar, baz, bar}
+enum myEnum {foo}
+message-structure: MSG : msgvals, NO : int, LNK : channel, MSG : int
+guard g(x: int, y: int, x: int) := TRUE;
+
+
+agent Agent
+    local: counter : int, counter: bool
+    init: counter == 0
+
+    repeat: (
+                label: {counter == 0} chan! TRUE () [counter := 1];
+                label: {counter == 1} chan! TRUE () [counter := 0]
+            )
+
+system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
+
+// This example should trigger the following warnings:
+// Duplicate channel name 'chan' [Ln 1, Col 17]
+// Duplicate enum 'msgvals' [Ln 3, Col 6]
+// Duplicate enum case 'bar' [Ln 3, Col 25]
+// Duplicate enum case 'foo' [Ln 4, Col 14]
+// Duplicate message variable 'MSG' [Ln 5, Col 60]
+// Duplicate parameter 'x' [Ln 6, Col 25]
+// Duplicate local variable 'counter' [Ln 10, Col 27]
+// Duplicate label 'label' [Ln 15, Col 17]
