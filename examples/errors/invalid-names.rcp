@@ -1,0 +1,14 @@
+channels: chan
+enum a {foo, bar}
+enum channels {bar}
+communication-variables: x : bool
+
+agent Agent
+    local: counter : int, agent: bool
+    init: TRUE
+
+    repeat: (
+                label: {counter == 0} chan! TRUE () [counter := 1]
+            )
+
+system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
