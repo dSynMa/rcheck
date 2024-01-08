@@ -3,26 +3,42 @@ enum msgvals {foo}
 enum msgvals {bar, baz, bar}
 enum myEnum {foo}
 message-structure: MSG : msgvals, NO : int, LNK : channel, MSG : int
-guard g(x: int, y: int, x: int) := TRUE;
+guard g(x: int, y: int, x: int, bar: int) := TRUE;
+communication-variables: foo : int
+guard g() := TRUE;
 
 
 agent Agent
-    local: counter : int, counter: bool
+    local: counter : int, counter: bool, chan: int
     init: counter == 0
 
     repeat: (
                 label: {counter == 0} chan! TRUE () [counter := 1];
-                label: {counter == 1} chan! TRUE () [counter := 0]
+                label: {counter == 1} chan! TRUE () [counter := 0];
+                myEnum: {counter == 1} chan! TRUE () [counter := 0]
             )
 
-system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
+system = Agent(one, TRUE) | Agent(foo, TRUE) | Agent(one, TRUE)
+
+SPEC F true;
+SPEC /\ foo : Agent . TRUE;
+SPEC /\ k : Agent . \/ k : Agent . TRUE;
 
 // This example should trigger the following errors:
-// Duplicate channel name 'chan' [Ln 1, Col 17]
-// Duplicate enum 'msgvals' [Ln 3, Col 6]
-// Duplicate enum case 'bar' [Ln 3, Col 25]
-// Duplicate enum case 'foo' [Ln 4, Col 14]
-// Duplicate message variable 'MSG' [Ln 5, Col 60]
+// Duplicate name 'chan' [Ln 1, Col 17]
+// Duplicate name 'msgvals' [Ln 3, Col 6]
+// Duplicate name 'bar' [Ln 3, Col 25]
+// Duplicate name 'foo' [Ln 4, Col 14]
+// Duplicate name 'MSG' [Ln 5, Col 60]
 // Duplicate parameter 'x' [Ln 6, Col 25]
-// Duplicate local variable 'counter' [Ln 10, Col 27]
-// Duplicate label 'label' [Ln 15, Col 17]
+// Duplicate parameter 'bar' [Ln 6, Col 33]
+// Duplicate name 'foo' [Ln 7, Col 26]
+// Duplicate name 'g' [Ln 8, Col 7]
+// Duplicate local variable 'counter' [Ln 12, Col 27]
+// Duplicate local variable 'chan' [Ln 12, Col 42]
+// Duplicate name 'label' [Ln 17, Col 17]
+// Duplicate name 'myEnum' [Ln 18, Col 17]
+// Duplicate name 'foo' [Ln 21, Col 35]
+// Duplicate name 'one' [Ln 21, Col 54]
+// Duplicate name 'foo' [Ln 24, Col 9]
+// Duplicate name 'k' [Ln 25, Col 24]
