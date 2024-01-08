@@ -5,7 +5,7 @@ enum msgvals {team, form, assemble}
 message-structure: MSG : msgvals, NO : int, LNK : channel
 communication-variables: type : 0..3, asgn : bool, rdy : 0..2
 
-guard g1(p : int, a : bool, t : int) := !a && (p==1 -> (t==1 | t==2)) &&(p==2 -> (t==1 | t==3));
+guard g1(p : int, b : bool, t : int) := !b && (p==1 -> (t==1 | t==2)) &&(p==2 -> (t==1 | t==3));
 
 guard g2(r : int, s : int) := (r==s);
 
