@@ -1,14 +1,10 @@
-import { addMonacoStyles, defineUserServices, MonacoEditorLanguageClientWrapper } from './bundle/index.js';
-import { configureWorker } from './setup.js';
+import { MonacoEditorLanguageClientWrapper, UserConfig } from 'monaco-editor-wrapper';
+import { configureWorker, defineUserServices } from './setupCommon.js';
 
-addMonacoStyles('monaco-editor-styles');
-
-export const setupConfigExtended = () => {
+export const setupConfigExtended = (): UserConfig => {
     const extensionFilesOrContents = new Map();
-    const languageConfigUrl = new URL('../language-configuration.json', window.location.href);
-    const textmateConfigUrl = new URL('../syntaxes/r-check.tmLanguage.json', window.location.href);
-    extensionFilesOrContents.set('/language-configuration.json', languageConfigUrl);
-    extensionFilesOrContents.set('/r-check-grammar.json', textmateConfigUrl);
+    extensionFilesOrContents.set('/language-configuration.json', new URL('../language-configuration.json', import.meta.url));
+    extensionFilesOrContents.set('/r-check-grammar.json', new URL('../syntaxes/r-check.tmLanguage.json', import.meta.url));
 
     return {
         wrapperConfig: {
@@ -55,8 +51,8 @@ export const setupConfigExtended = () => {
     };
 };
 
-export const executeExtended = async (htmlElement) => {
+export const executeExtended = async (htmlElement: HTMLElement) => {
     const userConfig = setupConfigExtended();
     const wrapper = new MonacoEditorLanguageClientWrapper();
-    await wrapper.start(userConfig, htmlElement);
+    await wrapper.initAndStart(userConfig, htmlElement);
 };

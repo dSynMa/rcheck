@@ -1,5 +1,5 @@
-import { AstNode, NamedAstNode, ValidationAcceptor, ValidationChecks, isAstNode, isNamed, streamAllContents, streamAst, streamContents } from 'langium';
-import { Agent, Model, RCheckAstType, isAssign, isBinExpr, isBox, isCommand, isDiamond, isExpr, isFinally, isGlobally, isLocal, isLtolQuant, isNext, isParam } from './generated/ast.js';
+import { AstNode, AstUtils, NamedAstNode, ValidationAcceptor, ValidationChecks, isAstNode, isNamed } from 'langium';
+import { Agent, Model, RCheckAstType, isAssign, isBinExpr, isBox, isDiamond, isExpr, isFinally, isGlobally, isLocal, isLtolQuant, isNext, isParam, isProcess } from './generated/ast.js';
 import type { RCheckServices } from './r-check-module.js';
 
 /**
@@ -25,7 +25,7 @@ function checkForLtol(node: AstNode, accept: ValidationAcceptor): void {
         accept("error", "LTOL not allowed here", {node: node})
     }
     if (isExpr(node)) {
-        streamContents(node).forEach(n => checkForLtol(n, accept));
+        AstUtils.streamContents(node).forEach(n => checkForLtol(n, accept));
     }
 }
 
@@ -53,15 +53,15 @@ export class RCheckValidator {
 
     async checkAgent(agent: Agent, accept: ValidationAcceptor): Promise<void> {
         checkDuplicates(agent.locals, "local variable", accept, this.globalNames);
-        checkDuplicates(streamAst(agent).filter(isCommand), "label", accept, this.globalNames);
+        checkDuplicates(AstUtils.streamAst(agent).filter(isProcess), "label", accept, this.globalNames);
 
         if (agent.init !== undefined){
             checkForLtol(agent.init, accept);
         }
         
-        for (const n of streamAst(agent)){
-            if (isAssign(n) || isCommand(n)) {
-                streamContents(n).forEach(m => checkForLtol(m, accept));
+        for (const n of AstUtils.streamAst(agent)){
+            if (isAssign(n) || isProcess(n)) {
+                AstUtils.streamContents(n).forEach(m => checkForLtol(m, accept));
             }
         }
         
@@ -69,13 +69,13 @@ export class RCheckValidator {
 
     checkModel(model: Model, accept: ValidationAcceptor): void {
         
-        const namedNodes = streamAst(model).filter(isNamed).filter(
-            n => !isParam(n) && !isLocal(n) && !isCommand(n) && !isLtolQuant(n)
+        const namedNodes = AstUtils.streamAst(model).filter(isNamed).filter(
+            n => !isParam(n) && !isLocal(n) && !isProcess(n) && !isLtolQuant(n)
         );
             
         this.globalNames = checkDuplicates(namedNodes, "name", accept);
         model.guards?.forEach(g => checkDuplicates(g.params, "parameter", accept, this.globalNames));
-        model.specs?.forEach(spec => checkDuplicates(streamAst(spec), "name", accept, this.globalNames));
+        model.specs?.forEach(spec => checkDuplicates(AstUtils.streamAst(spec), "name", accept, this.globalNames));
 
 
         if (model.commVars?.length == 0) {

@@ -1,18 +1,23 @@
-import type { AstNode, AstNodeDescription, DefaultSharedModuleContext, LangiumDocument, LangiumServices, LangiumSharedServices, Module, PartialLangiumServices, PrecomputedScopes } from 'langium';
-import { DefaultScopeComputation, createDefaultModule, createDefaultSharedModule, inject, streamAllContents, streamAst } from 'langium';
+import type { AstNode, AstNodeDescription, LangiumDocument, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
+import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, EMPTY_SCOPE, inject } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommand, Command, isCommVar } from './generated/ast.js';
+import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommVar, isProcess, Process} from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
+import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
+
+
+export class RCheckScopeProvider extends DefaultScopeProvider {
+    override getScope(_: ReferenceInfo): Scope {
+        return EMPTY_SCOPE;
+    }
+}
 
 export class RCheckScopeComputation extends DefaultScopeComputation {
-    constructor(services: LangiumServices) {
-        super(services);
-    }
 
     override async computeExports(document: LangiumDocument): Promise<AstNodeDescription[]> {
         const exportedDescriptions: AstNodeDescription[] = [];
-        for (const childNode of streamAllContents(document.parseResult.value)) {
+        for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
             // Export enum cases globally
             if (isEnum(childNode)) {
                 const enumNode: Enum = childNode as Enum;
@@ -52,13 +57,11 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
         for (const agent of model.agents) {
             const localDescriptions: AstNodeDescription[] = [];
             // Create descriptions for labels
-            for (const child of streamAst(agent.repeat)) {
-                if (isCommand(child)) {
-                    const cmd = child as Command;
-                    if (cmd.name !== undefined) {
-                        const descr = this.descriptions.createDescription(cmd, cmd.name, document);
-                        localDescriptions.push(descr);
-                    }
+            for (const child of AstUtils.streamAst(agent).filter(isProcess)) {
+                const cmd = child as Process;
+                if (cmd.name !== undefined) {
+                    const descr = this.descriptions.createDescription(cmd, cmd.name, document);
+                    localDescriptions.push(descr);
                 }
             }
             // Create descriptions for local variables
@@ -86,7 +89,7 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
                 }
             }
 
-            for (const child of streamAllContents(spec)) {
+            for (const child of AstUtils.streamAllContents(spec)) {
                 if (isQualifiedRef(child)) {
                     const qref = child as QualifiedRef;
                     if (instanceMap.has(qref.instance.$refText)){
@@ -95,7 +98,6 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
                     }
                     else if (quantMap.has(qref.instance.$refText)) {
                         const names = quantMap.get(qref.instance.$refText)!;
-                        // let allAgents = [];
                         for (const agentName of names) {
                             scopes.addAll(child, agentMap.get(agentName)!);
                         }
@@ -103,7 +105,6 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
                 }
             }
         }
-
 
         return scopes;
     }
@@ -134,7 +135,8 @@ export const RCheckModule: Module<RCheckServices, PartialLangiumServices & RChec
         RCheckValidator: () => new RCheckValidator()
     },
     references : {
-        ScopeComputation : (services) => new RCheckScopeComputation(services)
+        ScopeComputation : (services) => new RCheckScopeComputation(services),
+        // ScopeProvider: (services) => new RCheckScopeProvider(services),
     }
 };
 

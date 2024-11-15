@@ -8,7 +8,7 @@
             "out": "syntaxes/r-check.tmLanguage.json"
         },
         "monarch": {
-            "out": "syntaxes/r-check.monarch.ts"
+            "out": "src/syntaxes/r-check.monarch.ts"
         }
     }],
     "out": "src/language/generated"
