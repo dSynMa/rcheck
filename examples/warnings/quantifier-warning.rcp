@@ -9,7 +9,7 @@ agent Agent
                 {counter == 1} chan! TRUE () [counter := 0]
             )
 
-system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
+system = Agent(one, TRUE) || Agent(two, TRUE) || Agent(three, TRUE)
 
 SPEC \/ k : Agent . F TRUE;
 SPEC /\ k : Agent . F TRUE;

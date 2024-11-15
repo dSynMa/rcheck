@@ -11,7 +11,7 @@ entry Model:
     )*
     //Agents and instantiation
     (agents+=Agent)*
-    'system' '=' (system+=Instance ('|' system+=Instance)*)
+    'system' '=' (system+=Instance ('||' system+=Instance)*)
     // Specs
     ('SPEC' specs+=Ltol ';'?)*
     ;
@@ -31,7 +31,7 @@ Agent:
         ('local' ':' (locals+=Local (',' locals+=Local)*  ))
         | ('init' ':' init=Expr)
         | ('relabel' ':' (relabels+=Relabel)+)
-        | ('receive-guard' ':' Expr)
+        | ('receive-guard' ':' recvguard=Expr)
     )*
     'repeat' ':' repeat=Process
     ;
@@ -53,7 +53,7 @@ fragment CmdHeader: (name=ID ':')? '{' psi=Expr '}';
 fragment Update: '[' (update+=Assign (',' update+=Assign)*)? ']';
 fragment Data: '(' (data+=Assign (',' data+=Assign)*)? ')';
 
-Send infers Process: 
+Send infers Process:
     CmdHeader chanExpr=ChannelExpr '!' sendGuard=Expr Data Update;
 Receive infers Process: 
     CmdHeader chanExpr=ChannelExpr '?' Update;
@@ -62,7 +62,6 @@ Get infers Process:
 Supply infers Process: 
     CmdHeader 'SUPPLY@' '(' where=Expr ')' Data Update ;
 
-Command: Get|Supply|Send|Receive;
 
 Assign: left=[Target] ':=' right=Expr;
 
@@ -77,7 +76,7 @@ Range: lower=INT '..' upper=INT;
 fragment Params:
     params+=Param (',' params+=Param)* ;
 
-Target: Local | Channel | Case | Param | MsgStruct | CommVar | Command | Instance;
+Target: Local | Channel | Case | Param | MsgStruct | CommVar | Send | Receive | Get | Supply | Instance;
 
 Local: TypedDeclaration;
 Channel: name=ID;
@@ -88,7 +87,7 @@ CommVar: TypedDeclaration;
 Expr: Compound;
 
 Compound infers Expr:
-    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'U'|'R'|'W') right=Comparison)*;
+    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
 
 Comparison infers Expr:
     left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
@@ -136,16 +135,14 @@ LtolBase infers Ltol:
 
 Obs: CompoundObs;
 CompoundObs infers Obs:
-    BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'&&'|'||'|'->'|'<->') right=BaseObs)*;
+    BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'->'|'<->') right=BaseObs)*;
 
-BaseObs infers Obs:
-    {infer LiteralObs} value=('TRUE' | 'FALSE'| 'true'|'false')
-    | {infer ChannelObs} 'channel' ('=='|'=') (chan=ID | chan='*')
-    | {infer SenderObs} 'sender' ('=='|'=') sender=ID
-    | {infer ForallObs} 'forall' '(' (pred=Expr) ')'
-    | {infer ExistsObs} 'exists' '(' (pred=Expr) ')'
-    | {infer ExprObs} expr=Expr
-    ;
+BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
+LiteralObs: value=('TRUE'|'FALSE'); 
+ChannelObs: 'channel' ('=='|'='|'!=') (chan=ID | chan='*');
+SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
+ForallObs: 'forall' '(' (pred=Expr) ')';
+ExistsObs: 'exists' '(' (pred=Expr) ')';
 
 
 hidden terminal WS: /\s+/;
@@ -154,6 +151,5 @@ terminal BIGOR: /\\\//;
 terminal CV: /@([_a-zA-Z][\w_]*)/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal INT returns number: /[0-9]+/;
-terminal STRING: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
 hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

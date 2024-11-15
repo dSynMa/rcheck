@@ -11,7 +11,7 @@ agent Agent
                 {F counter == 1} chan! TRUE () [counter := X 0]
             )
 
-system = Agent(one, TRUE) | Agent(two, TRUE) | Agent(three, TRUE)
+system = Agent(one, TRUE) || Agent(two, TRUE) || Agent(three, TRUE)
 
 SPEC F TRUE;
 

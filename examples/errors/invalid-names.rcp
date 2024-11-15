@@ -1,6 +1,6 @@
 channels: chan
 enum a {foo, bar}
-enum channels {bar}
+// enum channels {bar}
 communication-variables: x : bool
 
 agent Agent

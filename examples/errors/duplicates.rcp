@@ -7,7 +7,6 @@ guard g(x: int, y: int, x: int, bar: int) := TRUE;
 communication-variables: foo : int
 guard g() := TRUE;
 
-
 agent Agent
     local: counter : int, counter: bool, chan: int
     init: counter == 0
