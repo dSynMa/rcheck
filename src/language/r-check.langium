@@ -112,7 +112,7 @@ BaseExpr infers Expr:
     | {infer Self} name='SELF'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
-    | {infer BoolLiteral} value=('TRUE' | 'FALSE'| 'true'|'false')
+    | {infer BoolLiteral} value=('TRUE' | 'FALSE')
     | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
     | {infer LtolMod} LtolMod
     | {infer LtolBase} LtolBase
