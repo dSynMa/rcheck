@@ -5,15 +5,15 @@ agent Agent
     init: counter == 0
 
     repeat: (
-                {counter == 0} chan! TRUE () [counter := 1];
-                {counter == 1} chan! TRUE () [counter := 0]
+                {counter == 0} chan! true () [counter := 1];
+                {counter == 1} chan! true () [counter := 0]
             )
 
-system = Agent(one, TRUE) || Agent(two, TRUE) || Agent(three, TRUE)
+system = Agent(one, true) || Agent(two, true) || Agent(three, true)
 
-SPEC \/ k : Agent . F TRUE;
-SPEC /\ k : Agent . F TRUE;
-SPEC F TRUE;
+SPEC \/ k : Agent . F true;
+SPEC /\ k : Agent . F true;
+SPEC F true;
 
 // This example should trigger the following warnings:
 // Quantified formula, but system has no property identifiers [ln 14, Col 6]

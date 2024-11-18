@@ -21,7 +21,7 @@ agent Client
 
             (sRequest: {cLink!=empty} cLink! g(role,cLink,mLink)(MSG := request)[cLink := c];
              rConnect: {mLink==empty & MSG == connect} cLink? [mLink := LNK];
-             sRelease: {TRUE} *! g(role,cLink,mLink)(MSG := release)[cLink := empty];
+             sRelease: {true} *! g(role,cLink,mLink)(MSG := release)[cLink := empty];
              sBuy: {mLink!=empty} mLink! g(role,cLink,mLink)(MSG := buy)[mLink := empty]
 
             +
@@ -38,10 +38,10 @@ agent Manager
 
     repeat: (
             rRequest: {MSG == request} cLink? [];
-            sForward: {TRUE} fLink! (TRUE)(MSG := request)[];
+            sForward: {true} fLink! (true)(MSG := request)[];
             (
              rep (rFull: {MSG == full} fLink? [];
-                  sRequest: {TRUE} sLink! (TRUE)(MSG := request)[]
+                  sRequest: {true} sLink! (true)(MSG := request)[]
                  )
              +
              rConnect: {MSG == connect} cLink? []
@@ -58,21 +58,21 @@ agent Machine
     repeat: (
            rForward: {cLink==empty & MSG == request} gLink? [cLink:= c];
             (
-             sConnect: {cLink==c & !asgn} cLink! (TRUE)(MSG := connect, LNK := pLink)[cLink:= empty, asgn:= TRUE]
+             sConnect: {cLink==c & !asgn} cLink! (true)(MSG := connect, LNK := pLink)[cLink:= empty, asgn:= true]
              +
-             sFull: {cLink==c & asgn} gLink! (TRUE)(MSG := full)[cLink:= empty, asgn:= TRUE]
+             sFull: {cLink==c & asgn} gLink! (true)(MSG := full)[cLink:= empty, asgn:= true]
              +
              rConnect: {cLink==c & MSG == connect} cLink? [cLink:= empty]
 
 
              +
-             rFull: {cLink==c & asgn & MSG == full} gLink? [cLink:= empty, asgn:= TRUE]
+             rFull: {cLink==c & asgn & MSG == full} gLink? [cLink:= empty, asgn:= true]
             )
             +
             rBuy: {MSG == buy} pLink? []
             )
 
-system = Client(client,TRUE) || Client(client2,TRUE) || Manager(manager,TRUE) || Machine(machine,gLink==g1 & pLink==vmm) || Machine(machine2,gLink==g1 & pLink==vmm2)
+system = Client(client,true) || Client(client2,true) || Manager(manager,true) || Machine(machine,gLink==g1 & pLink==vmm) || Machine(machine2,gLink==g1 & pLink==vmm2)
 
 SPEC F client-mLink=vmm;
 SPEC F client-sBuy;

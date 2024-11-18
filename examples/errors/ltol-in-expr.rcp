@@ -7,13 +7,13 @@ agent Agent
     init: counter == 0 U counter == 1
 
     repeat: (
-                {counter == G 0} chan! TRUE () [counter := 1 U true];
-                {F counter == 1} chan! TRUE () [counter := X 0]
+                {counter == G 0} chan! true () [counter := 1 U true];
+                {F counter == 1} chan! true () [counter := X 0]
             )
 
-system = Agent(one, TRUE) || Agent(two, TRUE) || Agent(three, TRUE)
+system = Agent(one, true) || Agent(two, true) || Agent(three, true)
 
-SPEC F TRUE;
+SPEC F true;
 
 // This example should trigger the following errors:
 //  LTOL not allowed here [Ln 2, Col 21]
