@@ -14,11 +14,11 @@ const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 const packagePath = path.resolve(__dirname, '..', '..', 'package.json');
 const packageContent = await fs.readFile(packagePath, 'utf-8');
 
-export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
+export const generateAction = async (fileName: string): Promise<void> => {
     const services = createRCheckServices(NodeFileSystem).RCheck;
     const model = await extractAstNode<Model>(fileName, services);
-    const generatedFilePath = generateJavaScript(model, fileName, opts.destination);
-    console.log(chalk.green(`JavaScript code generated successfully: ${generatedFilePath}`));
+    const stringified = JSON.stringify(model, getAstReplacer());
+    console.log(stringified);
 };
 
 export const parseAndValidate = async (fileName: string): Promise<void> => {
@@ -29,7 +29,7 @@ export const parseAndValidate = async (fileName: string): Promise<void> => {
     // extract the parse result details
     const parseResult = document.parseResult;
     // verify no lexer, parser, or general diagnostic errors show up
-    if (parseResult.lexerErrors.length === 0 && 
+    if (parseResult.lexerErrors.length === 0 &&
         parseResult.parserErrors.length === 0
     ) {
         console.log(chalk.green(`Parsed and validated ${fileName} successfully!`));
@@ -42,7 +42,7 @@ export type GenerateOptions = {
     destination?: string;
 }
 
-export default function(): void {
+export default function (): void {
     const program = new Command();
 
     program.version(JSON.parse(packageContent).version);
@@ -51,8 +51,7 @@ export default function(): void {
     program
         .command('generate')
         .argument('<file>', `source file (possible file extensions: ${fileExtensions})`)
-        .option('-d, --destination <dir>', 'destination directory of generating')
-        .description('generates JavaScript code that prints "Hello, {name}!" for each greeting in a source file')
+        .description('Parses source file and prints a JSON of the AST')
         .action(generateAction);
     program
         .command('parseAndValidate')
