@@ -112,7 +112,7 @@ BaseExpr infers Expr:
     | {infer Self} name='SELF'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
-    | {infer BoolLiteral} value=('TRUE' | 'FALSE')
+    | {infer BoolLiteral} value=('true'|'false')
     | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
     | {infer LtolMod} LtolMod
     | {infer LtolBase} LtolBase
@@ -138,7 +138,7 @@ CompoundObs infers Obs:
     BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'->'|'<->') right=BaseObs)*;
 
 BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
-LiteralObs: value=('TRUE'|'FALSE'); 
+LiteralObs: value=('true'|'false'); 
 ChannelObs: 'channel' ('=='|'='|'!=') (chan=ID | chan='*');
 SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
 ForallObs: 'forall' '(' (pred=Expr) ')';

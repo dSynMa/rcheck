@@ -3,25 +3,25 @@ enum msgvals {foo}
 enum msgvals {bar, baz, bar}
 enum myEnum {foo}
 message-structure: MSG : msgvals, NO : int, LNK : channel, MSG : int
-guard g(x: int, y: int, x: int, bar: int) := TRUE;
+guard g(x: int, y: int, x: int, bar: int) := true;
 communication-variables: foo : int
-guard g() := TRUE;
+guard g() := true;
 
 agent Agent
     local: counter : int, counter: bool, chan: int
     init: counter == 0
 
     repeat: (
-                label: {counter == 0} chan! TRUE () [counter := 1];
-                label: {counter == 1} chan! TRUE () [counter := 0];
-                myEnum: {counter == 1} chan! TRUE () [counter := 0]
+                label: {counter == 0} chan! true () [counter := 1];
+                label: {counter == 1} chan! true () [counter := 0];
+                myEnum: {counter == 1} chan! true () [counter := 0]
             )
 
-system = Agent(one, TRUE) | Agent(foo, TRUE) | Agent(one, TRUE)
+system = Agent(one, true) | Agent(foo, true) | Agent(one, true)
 
 SPEC F true;
-SPEC /\ foo : Agent . TRUE;
-SPEC /\ k : Agent . \/ k : Agent . TRUE;
+SPEC /\ foo : Agent . true;
+SPEC /\ k : Agent . \/ k : Agent . true;
 
 // This example should trigger the following errors:
 // Duplicate name 'chan' [Ln 1, Col 17]

@@ -50,7 +50,7 @@ agent Robot
                             [lnk:=LNK, no:=NO])
                     +
                       (  {no>=1} *! (@type==btype & !@asgn)
-                            (MSG :=form, NO := no-1, LNK := lnk)[basgn:=TRUE, no:=0];
+                            (MSG :=form, NO := no-1, LNK := lnk)[basgn:=true, no:=0];
 
                         {MSG ==assemble & brdy==1} lnk ?
                             [brdy:=2];
@@ -61,12 +61,12 @@ agent Robot
                     )
 )
 
-system = Line(one,TRUE) || Robot(two,TRUE) || Robot(three,TRUE)
+system = Line(one,true) || Robot(two,true) || Robot(three,true)
 
-SPEC G((one-prd = 1 & one-stage = 0 & (<<sender=one & channel = *>>TRUE)) -> (<<exists(type = 1) & exists(type = 2) & forall(type = 1 | type = 2)>>TRUE))
+SPEC G((one-prd = 1 & one-stage = 0 & (<<sender=one & channel = *>>true)) -> (<<exists(type = 1) & exists(type = 2) & forall(type = 1 | type = 2)>>true))
 SPEC F F three-btype = 1
-SPEC F !<<channel != *>>!TRUE
-SPEC F <<channel = *>>TRUE
-SPEC F (<<channel = *>>TRUE)
+SPEC F !<<channel != *>>!true
+SPEC F <<channel = *>>true
+SPEC F (<<channel = *>>true)
 SPEC /\ k : Robot . F k-btype = 1
 SPEC /\ k : Robot | Line . F k-lnk = a
