@@ -12,9 +12,12 @@ We assume that Langium is already installed.
 ```bash
 git clone https://github.com/dSynMa/rcheck.git  # Clones the repo
 cd rcheck 
+npm install
 npm run langium:generate && npm run build  # Generates syntaxes, scripts, etc.
 code .  # Opens repository in VS Code
 ```
+
+Notice that running `make all` is equivalent to running the commands `npm run langium:generate` followed by `npm run build`.
 
 Then, run `Debug: start debugging` from Code's command palette (default shortcut is `[F5]`).
 This will open a new VS Code window with the extension pre-loaded.
