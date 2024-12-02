@@ -4,7 +4,7 @@ enum msgvals {bar, baz, bar}
 enum myEnum {foo}
 message-structure: MSG : msgvals, NO : int, LNK : channel, MSG : int
 guard g(x: int, y: int, x: int, bar: int) := true;
-communication-variables: foo : int
+property-variables: foo : int
 guard g() := true;
 
 agent Agent

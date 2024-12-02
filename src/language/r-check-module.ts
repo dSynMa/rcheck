@@ -1,7 +1,7 @@
 import type { AstNode, AstNodeDescription, LangiumDocument, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
 import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, EMPTY_SCOPE, inject } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommVar, isCommand, Command} from './generated/ast.js';
+import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isPropVar, isCommand, Command} from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
 import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
@@ -27,7 +27,7 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
                 }
             }
             // Export @-prefixed names for property identifiers
-            if (isCommVar(childNode)) {
+            if (isPropVar(childNode)) {
                 exportedDescriptions.push(this.descriptions.createDescription(childNode, "@" + childNode.name, document))
             }
         }

@@ -1,7 +1,7 @@
 channels: chan
 enum a {foo, bar}
 enum channels {bar}
-communication-variables: x : bool
+property-variables: x : bool
 
 agent Agent
     local: counter : int, agent: bool, true: int

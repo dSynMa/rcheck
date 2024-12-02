@@ -3,7 +3,7 @@ channels: a, empty
 enum msgvals {team, form, assemble}
 
 message-structure: MSG : msgvals, NO : int, LNK : channel
-communication-variables: type : 0..3, asgn : bool, rdy : 0..2
+property-variables: type : 0..3, asgn : bool, rdy : 0..2
 
 guard g1(p : int, b : bool, t : int) := !b & (p==1 -> (t==1 | t==2)) &(p==2 -> (t==1 | t==3));
 

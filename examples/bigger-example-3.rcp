@@ -2,17 +2,21 @@ channels: c, empty, g1, g2,vmm1,vmm2,vmm
 enum rolevals {clnt, vm, mgr}
 enum msgvals {reserve, request, release, buy, connect, full}
 message-structure: MSG : msgvals, LNK : channel
-communication-variables: cv : rolevals
+property-variables: cv : rolevals
 guard g(r : rolevals, ch : channel, m : channel) := (channel == *) & (@cv == r) | (channel == ch) & (@cv == mgr) | (channel == m) ;
 
 agent Client
-    local: role : rolevals, cLink : channel, mLink : channel
+    local: role : rolevals, cLink : channel, mLink : channel, b: location
     init: cLink == c & mLink == empty & role==clnt
     relabel:
         cv <- role
     receive-guard: (channel == *) | (channel == cLink)
 
     repeat: (
+            {true} GET@(b) []
+            +
+            {true} SUPPLY@(ANY)() []
+            +
             (sReserve: {cLink==c} *! g(role,cLink,mLink)(MSG := reserve)[cLink := c]
             +
             rReserve: {cLink==c & MSG == reserve} *? [cLink := empty]
