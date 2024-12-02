@@ -6,7 +6,7 @@ entry Model:
         ('channels' ':' channels+=Channel (',' channels+=Channel)*)
         | (enums+=Enum)
         | ('message-structure' ':' msgStructs+=MsgStruct (',' msgStructs+=MsgStruct)*)
-        | ('communication-variables' ':' commVars+=CommVar (',' commVars+=CommVar)*)
+        | ('property-variables' ':' propVars+=PropVar (',' propVars+=PropVar)*)
         | guards+=Guard
     )*
     //Agents and instantiation
@@ -36,7 +36,7 @@ Agent:
     'repeat' ':' repeat=Choice
     ;
 
-Relabel: var=[CommVar] '<-' CompoundExpr;
+Relabel: var=[PropVar] '<-' CompoundExpr;
 
 Choice: 
     left=Sequence ({infer Choice.left=current} '+' right=Sequence)*;
@@ -82,13 +82,13 @@ Range: lower=INT '..' upper=INT;
 fragment Params:
     params+=Param (',' params+=Param)* ;
 
-Target: Local | Channel | Case | Param | MsgStruct | CommVar | Send | Receive | Get | Supply | Instance;
+Target: Local | Channel | Case | Param | MsgStruct | PropVar | Send | Receive | Get | Supply | Instance;
 
 Local: TypedDeclaration;
 Channel: name=ID;
 Param: TypedDeclaration;
 MsgStruct: TypedDeclaration;
-CommVar: TypedDeclaration;
+PropVar: TypedDeclaration;
 
 
 CompoundExpr:
@@ -110,7 +110,7 @@ BaseExpr:
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
     | {infer QualifiedRef} instance=[Qualifier] '-' variable=[Target]
     | {infer Ref} variable=[Target]
-    | {infer CommVarRef} variable=[CommVar:CV]
+    | {infer PropVarRef} variable=[PropVar:PV]
     | {infer UMinus} '-' expr=BaseExpr
     | {infer Neg} '!' expr=BaseExpr
     | {infer Ref} currentChannel='channel'
@@ -154,7 +154,7 @@ ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';
 hidden terminal WS: /\s+/;
 terminal BIGAND: /\/\\/;
 terminal BIGOR: /\\\//;
-terminal CV: /@([_a-zA-Z][\w_]*)/;
+terminal PV: /@([_a-zA-Z][\w_]*)/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal INT returns number: /[0-9]+/;
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
