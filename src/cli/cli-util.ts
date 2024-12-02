@@ -61,7 +61,8 @@ export const getAstReplacer = () => {
     return (key: any, value: any) => {
         // Remove Langium nodes that we won't need
         if (
-            key === "references" || key === "$cstNode" || key === "$refNode"
+            key === "references" || key === "$cstNode" || key === "$refNode" ||
+            key === "_ref" || key === "ref"
             ||
             key === "$nodeDescription" || key === "_nodeDescription") {
             return;
