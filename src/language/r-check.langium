@@ -59,9 +59,9 @@ Send:
 Receive: 
     CmdHeader chanExpr=ChannelExpr '?' Update;
 Get: 
-    CmdHeader op='GET@' '(' where=CompoundExpr ')' Update ;
+    CmdHeader op='GET@' '(' where=LocationExpr ')' Update ;
 Supply: 
-    CmdHeader op='SUPPLY@' '(' where=CompoundExpr ')' Data Update ;
+    CmdHeader op='SUPPLY@' '(' where=SupplyLocationExpr ')' Data Update ;
 
 type Command = Send | Receive | Get | Supply;
 type Process = BaseProcess | Rep | Sequence | Choice;
@@ -70,9 +70,12 @@ Assign: left=[Target] ':=' right=CompoundExpr;
 
 ChannelExprRef: Channel | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
+LocationExprRef: Instance | Local;
+LocationExpr: (location=[LocationExprRef]);
+SupplyLocationExpr: (location=[LocationExprRef] | self="SELF" | any="ANY");
 
 fragment TypedDeclaration: 
-    name=ID ':' (builtinType=('bool'|'int'|'channel') | customType=[Enum] | rangeType=Range);
+    name=ID ':' (builtinType=('bool'|'int'|'channel'|'location') | customType=[Enum] | rangeType=Range);
 
 Range: lower=INT '..' upper=INT;
 
@@ -111,7 +114,6 @@ BaseExpr:
     | {infer UMinus} '-' expr=BaseExpr
     | {infer Neg} '!' expr=BaseExpr
     | {infer Ref} currentChannel='channel'
-    | {infer Self} name='SELF'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('true'|'false')
