@@ -1,7 +1,7 @@
 import type { AstNode, AstNodeDescription, LangiumDocument, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
 import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, EMPTY_SCOPE, inject } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommVar, isProcess, Process} from './generated/ast.js';
+import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isCommVar, isCommand, Command} from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
 import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
@@ -57,8 +57,8 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
         for (const agent of model.agents) {
             const localDescriptions: AstNodeDescription[] = [];
             // Create descriptions for labels
-            for (const child of AstUtils.streamAst(agent).filter(isProcess)) {
-                const cmd = child as Process;
+            for (const child of AstUtils.streamAst(agent).filter(isCommand)) {
+                const cmd = child as Command;
                 if (cmd.name !== undefined) {
                     const descr = this.descriptions.createDescription(cmd, cmd.name, document);
                     localDescriptions.push(descr);
