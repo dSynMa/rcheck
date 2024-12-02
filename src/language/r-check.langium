@@ -92,7 +92,7 @@ CommVar: TypedDeclaration;
 
 
 CompoundExpr:
-    left=Comparison ({infer Compound.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
+    left=Comparison ({infer CompoundExpr.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
 
 Comparison:
     left=AddSub ({infer Comparison.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
