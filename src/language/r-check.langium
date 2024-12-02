@@ -16,54 +16,57 @@ entry Model:
     ('SPEC' specs+=Ltol ';'?)*
     ;
 
-Instance: agent=[Agent] '(' name=ID ',' init=Expr ')';
+Instance: agent=[Agent] '(' name=ID ',' init=CompoundExpr ')';
 Enum:
     'enum' name=ID '{' cases+=Case (',' cases+=Case)* '}';
 
 Case: name=ID;
 
 Guard:
-    'guard' name=ID '(' Params? ')' ':=' body=Expr ';';
+    'guard' name=ID '(' Params? ')' ':=' body=CompoundExpr ';';
 
 Agent:
     'agent' name=ID
     (
         ('local' ':' (locals+=Local (',' locals+=Local)*  ))
-        | ('init' ':' init=Expr)
+        | ('init' ':' init=CompoundExpr)
         | ('relabel' ':' (relabels+=Relabel)+)
-        | ('receive-guard' ':' recvguard=Expr)
+        | ('receive-guard' ':' recvguard=CompoundExpr)
     )*
-    'repeat' ':' repeat=Process
+    'repeat' ':' repeat=Choice
     ;
 
-Relabel: var=[CommVar] '<-' Expr;
+Relabel: var=[CommVar] '<-' CompoundExpr;
 
-Process: Choice;
+Choice: 
+    left=Sequence ({infer Choice.left=current} '+' right=Sequence)*;
 
-Choice infers Process: 
-    left=Sequence ({infer BinProcess.left=current} '+' right=Sequence)*;
+Sequence:
+    left=BaseProcess ({infer Sequence.left=current} ';' right=BaseProcess)*;
 
-Sequence infers Process:
-    left=BaseProcess ({infer BinProcess.left=current} ';' right=BaseProcess)*;
+BaseProcess: 
+    Send | Receive | Get | Supply | '(' Choice ')' | Rep;
 
-BaseProcess infers Process: 
-    Send | Receive | Get | Supply | '(' Process ')' | {infer Rep} 'rep' Process;
+Rep:
+    'rep' process=Choice;
 
-fragment CmdHeader: (name=ID ':')? '{' psi=Expr '}';
+fragment CmdHeader: (name=ID ':')? '{' psi=CompoundExpr '}';
 fragment Update: '[' (update+=Assign (',' update+=Assign)*)? ']';
 fragment Data: '(' (data+=Assign (',' data+=Assign)*)? ')';
 
-Send infers Process:
-    CmdHeader chanExpr=ChannelExpr '!' sendGuard=Expr Data Update;
-Receive infers Process: 
+Send:
+    CmdHeader chanExpr=ChannelExpr '!' sendGuard=CompoundExpr Data Update;
+Receive: 
     CmdHeader chanExpr=ChannelExpr '?' Update;
-Get infers Process: 
-    CmdHeader 'GET@' '(' where=Expr ')' Update ;
-Supply infers Process: 
-    CmdHeader 'SUPPLY@' '(' where=Expr ')' Data Update ;
+Get: 
+    CmdHeader op='GET@' '(' where=CompoundExpr ')' Update ;
+Supply: 
+    CmdHeader op='SUPPLY@' '(' where=CompoundExpr ')' Data Update ;
 
+type Command = Send | Receive | Get | Supply;
+type Process = BaseProcess | Rep | Sequence | Choice;
 
-Assign: left=[Target] ':=' right=Expr;
+Assign: left=[Target] ':=' right=CompoundExpr;
 
 ChannelExprRef: Channel | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
@@ -84,24 +87,23 @@ Param: TypedDeclaration;
 MsgStruct: TypedDeclaration;
 CommVar: TypedDeclaration;
 
-Expr: Compound;
 
-Compound infers Expr:
-    left=Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
+CompoundExpr:
+    left=Comparison ({infer Compound.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
 
-Comparison infers Expr:
-    left=AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
+Comparison:
+    left=AddSub ({infer Comparison.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
 
-AddSub infers Expr:
+AddSub:
     MulDiv ({infer BinExpr.left=current} operator=('+' | '-') right=MulDiv)*;
 
-MulDiv infers Expr:
+MulDiv:
     BaseExpr ({infer BinExpr.left=current} operator=('*' | '/') right=BaseExpr)*;
 
 Qualifier : Instance | LtolQuant;
 
-BaseExpr infers Expr:
-    '(' Expr ')'
+BaseExpr:
+    '(' CompoundExpr ')'
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
     | {infer QualifiedRef} instance=[Qualifier] '-' variable=[Target]
     | {infer Ref} variable=[Target]
@@ -113,24 +115,26 @@ BaseExpr infers Expr:
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('true'|'false')
-    | {infer GuardCall} guard=[Guard] '(' (args+=Expr (',' args+=Expr)*)? ')'
+    | {infer GuardCall} guard=[Guard] '(' (args+=CompoundExpr (',' args+=CompoundExpr)*)? ')'
     | {infer LtolMod} LtolMod
     | {infer LtolBase} LtolBase
     ;
 
-Ltol: (quants+=LtolQuant)* Expr;
+type Expr = BaseExpr | BinExpr | CompoundExpr | Comparison ;
+
+Ltol: (quants+=LtolQuant)* CompoundExpr;
 
 LtolQuant: op=(BIGAND|BIGOR) name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
 
 LtolMod infers Ltol:
-    {infer Finally} 'F' phi=Expr
-    | {infer Globally} 'G' phi=Expr
-    | {infer Next} 'X' phi=Expr
+    {infer Finally} 'F' phi=CompoundExpr
+    | {infer Globally} 'G' phi=CompoundExpr
+    | {infer Next} 'X' phi=CompoundExpr
     ;
 
 LtolBase infers Ltol:
-    {infer Diamond} '<<' obs=Obs '>>' phi=Expr
-    | {infer Box} '[' obs=Obs ']' phi=Expr
+    {infer Diamond} '<<' obs=Obs '>>' phi=CompoundExpr
+    | {infer Box} '[' obs=Obs ']' phi=CompoundExpr
     ;
 
 Obs: CompoundObs;
@@ -141,8 +145,8 @@ BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
 LiteralObs: value=('true'|'false'); 
 ChannelObs: 'channel' ('=='|'='|'!=') (chan=ID | chan='*');
 SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
-ForallObs: 'forall' '(' (pred=Expr) ')';
-ExistsObs: 'exists' '(' (pred=Expr) ')';
+ForallObs: 'forall' '(' (pred=CompoundExpr) ')';
+ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';
 
 
 hidden terminal WS: /\s+/;
