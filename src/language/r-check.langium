@@ -136,7 +136,7 @@ LtolMod infers Ltol:
 
 LtolBase infers Ltol:
     {infer Diamond} '<<' obs=Obs '>>' phi=CompoundExpr
-    | {infer Box} '[' obs=Obs ']' phi=CompoundExpr
+    | {infer Box} '[[' obs=Obs ']]' phi=CompoundExpr
     ;
 
 Obs: CompoundObs;
