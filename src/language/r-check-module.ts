@@ -94,12 +94,22 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
                     const qref = child as QualifiedRef;
                     if (instanceMap.has(qref.instance.$refText)){
                         const agentName = instanceMap.get(qref.instance.$refText)!;
-                        scopes.addAll(child, agentMap.get(agentName)!);
+                        if (agentName !== undefined) {
+                            const descriptions = agentMap.get(agentName);
+                            if (descriptions !== undefined) {
+                                scopes.addAll(child, descriptions);
+                            }
+                        }
                     }
                     else if (quantMap.has(qref.instance.$refText)) {
                         const names = quantMap.get(qref.instance.$refText)!;
-                        for (const agentName of names) {
-                            scopes.addAll(child, agentMap.get(agentName)!);
+                        if (names !== undefined) {
+                            for (const agentName of names) {
+                                const descriptions = agentMap.get(agentName);
+                                if (descriptions !== undefined) {
+                                    scopes.addAll(child, descriptions);
+                                }
+                            }
                         }
                     }
                 }
