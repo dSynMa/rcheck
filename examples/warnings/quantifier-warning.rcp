@@ -11,8 +11,8 @@ agent Agent
 
 system = Agent(one, true) || Agent(two, true) || Agent(three, true)
 
-SPEC \/ k : Agent . F true;
-SPEC /\ k : Agent . F true;
+SPEC exists k : Agent . F true;
+SPEC forall k : Agent . F true;
 SPEC F true;
 
 // This example should trigger the following warnings:
