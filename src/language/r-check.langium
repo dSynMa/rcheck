@@ -75,7 +75,7 @@ LocationExpr: (location=[LocationExprRef]);
 SupplyLocationExpr: (location=[LocationExprRef] | self="SELF" | any="ANY");
 
 fragment TypedDeclaration: 
-    name=ID ':' (builtinType=('bool'|'int'|'channel'|'location') | customType=[Enum] | rangeType=Range);
+    name=ID ':' (builtinType=('bool'|'int'|'channels'|'location') | customType=[Enum] | rangeType=Range);
 
 Range: lower=INT '..' upper=INT;
 
@@ -113,7 +113,7 @@ BaseExpr:
     | {infer PropVarRef} variable=[PropVar:PV]
     | {infer UMinus} '-' expr=BaseExpr
     | {infer Neg} '!' expr=BaseExpr
-    | {infer Ref} currentChannel='channel'
+    | {infer Ref} currentChannel='chan'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('true'|'false')
@@ -145,7 +145,7 @@ CompoundObs infers Obs:
 
 BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
 LiteralObs: value=('true'|'false'); 
-ChannelObs: 'channel' ('=='|'='|'!=') (chan=ID | chan='*');
+ChannelObs: 'chan' ('=='|'='|'!=') (chan=ID | chan='*');
 SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
 ForallObs: 'forall' '(' (pred=CompoundExpr) ')';
 ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';

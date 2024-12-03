@@ -2,7 +2,7 @@ channels: a, empty
 
 enum msgvals {team, form, assemble}
 
-message-structure: MSG : msgvals, NO : int, LNK : channel
+message-structure: MSG : msgvals, NO : int, LNK : channels
 property-variables: type : 0..3, asgn : bool, rdy : 0..2
 
 guard g1(p : int, b : bool, t : int) := !b & (p==1 -> (t==1 | t==2)) &(p==2 -> (t==1 | t==3));
@@ -10,13 +10,13 @@ guard g1(p : int, b : bool, t : int) := !b & (p==1 -> (t==1 | t==2)) &(p==2 -> (
 guard g2(r : int, s : int) := (r==s);
 
 agent Line
-    local: stage : int, lnk : channel, prd : int
+    local: stage : int, lnk : channels, prd : int
     init: stage == 0 & lnk == a & (prd == 1 | prd == 2)
     relabel:
         type <- 0
         asgn <- false
         rdy <- 0
-    receive-guard: (channel == *)
+    receive-guard: (chan == *)
 
     repeat: (
                 {stage==0} *! g1(prd,@asgn,@type)
@@ -30,13 +30,13 @@ agent Line
             )
 
 agent Robot
-        local: btype : int, lnk : channel, basgn : bool, brdy : 0..2, no  : int
+        local: btype : int, lnk : channels, basgn : bool, brdy : 0..2, no  : int
         init: btype == 1 & lnk == empty & basgn == false & brdy == 0 & no == 0
         relabel:
             type <- btype
             asgn <- basgn
             rdy <- brdy
-        receive-guard: (channel == *) | (channel == lnk)
+        receive-guard: (chan == *) | (chan == lnk)
 
         repeat: (
                     {MSG == team} * ?
@@ -63,10 +63,10 @@ agent Robot
 
 system = Line(one,true) || Robot(two,true) || Robot(three,true)
 
-SPEC G((one-prd = 1 & one-stage = 0 & (<<sender=one & channel = *>>true)) -> (<<exists(type = 1) & exists(type = 2) & forall(type = 1 | type = 2)>>true))
+SPEC G((one-prd = 1 & one-stage = 0 & (<<sender=one & chan = *>>true)) -> (<<exists(type = 1) & exists(type = 2) & forall(type = 1 | type = 2)>>true))
 SPEC F F three-btype = 1
-SPEC F !<<channel != *>>!true
-SPEC F <<channel = *>>true
-SPEC F (<<channel = *>>true)
+SPEC F !<<chan != *>>!true
+SPEC F <<chan = *>>true
+SPEC F (<<chan = *>>true)
 SPEC /\ k : Robot . F k-btype = 1
 SPEC /\ k : Robot | Line . F k-lnk = a
