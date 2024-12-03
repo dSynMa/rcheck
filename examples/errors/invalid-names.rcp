@@ -11,4 +11,4 @@ agent Agent
                 label: {counter == 0} chan! true () [counter := 1]
             )
 
-system = Agent(one, true) | Agent(two, true) | Agent(three, true)
+system = Agent(one, true) || Agent(two, true) || Agent(three, true)

@@ -1,4 +1,4 @@
-channels: chan, chan
+channels: ch, ch
 enum msgvals {foo}
 enum msgvals {bar, baz, bar}
 enum myEnum {foo}
@@ -8,13 +8,13 @@ property-variables: foo : int
 guard g() := true;
 
 agent Agent
-    local: counter : int, counter: bool, chan: int
+    local: counter : int, counter: bool, ch: int
     init: counter == 0
 
     repeat: (
-                label: {counter == 0} chan! true () [counter := 1];
-                label: {counter == 1} chan! true () [counter := 0];
-                myEnum: {counter == 1} chan! true () [counter := 0]
+                label: {counter == 0} ch! true () [counter := 1];
+                label: {counter == 1} ch! true () [counter := 0];
+                myEnum: {counter == 1} ch! true () [counter := 0]
             )
 
 system = Agent(one, true) | Agent(foo, true) | Agent(one, true)
@@ -24,7 +24,7 @@ SPEC /\ foo : Agent . true;
 SPEC /\ k : Agent . \/ k : Agent . true;
 
 // This example should trigger the following errors:
-// Duplicate name 'chan' [Ln 1, Col 17]
+// Duplicate name 'ch' [Ln 1, Col 17]
 // Duplicate name 'msgvals' [Ln 3, Col 6]
 // Duplicate name 'bar' [Ln 3, Col 25]
 // Duplicate name 'foo' [Ln 4, Col 14]
