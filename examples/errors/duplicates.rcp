@@ -20,8 +20,8 @@ agent Agent
 system = Agent(one, true) | Agent(foo, true) | Agent(one, true)
 
 SPEC F true;
-SPEC /\ foo : Agent . true;
-SPEC /\ k : Agent . \/ k : Agent . true;
+SPEC forall foo : Agent . true;
+SPEC forall k : Agent . exists k : Agent . true;
 
 // This example should trigger the following errors:
 // Duplicate name 'ch' [Ln 1, Col 17]

@@ -68,5 +68,5 @@ SPEC F F three-btype = 1
 SPEC F !<<chan != *>>!true
 SPEC F <<chan = *>>true
 SPEC F (<<chan = *>>true)
-SPEC /\ k : Robot . F k-btype = 1
-SPEC /\ k : Robot | Line . F k-lnk = a
+SPEC forall k : Robot . F k-btype = 1
+SPEC forall k : Robot | Line . F k-lnk = a
