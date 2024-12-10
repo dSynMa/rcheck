@@ -3,7 +3,7 @@ grammar RCheck
 entry Model:
     //Global section
     (
-        ('channels' ':' channels+=Channel (',' channels+=Channel)*)
+        ('channel' channel+=Channel (',' channel+=Channel)*)
         | (enums+=Enum)
         | ('message-structure' ':' msgStructs+=MsgStruct (',' msgStructs+=MsgStruct)*)
         | ('property-variables' ':' propVars+=PropVar (',' propVars+=PropVar)*)
@@ -75,7 +75,7 @@ LocationExpr: (location=[LocationExprRef]);
 SupplyLocationExpr: (location=[LocationExprRef] | self="SELF" | any="ANY");
 
 fragment TypedDeclaration: 
-    name=ID ':' (builtinType=('bool'|'int'|'channels'|'location') | customType=[Enum] | rangeType=Range);
+    name=ID ':' (builtinType=('bool'|'int'|'channel'|'location') | customType=[Enum] | rangeType=Range);
 
 Range: lower=INT '..' upper=INT;
 
@@ -126,7 +126,7 @@ type Expr = BaseExpr | BinExpr | CompoundExpr | Comparison ;
 
 Ltol: (quants+=LtolQuant)* CompoundExpr;
 
-LtolQuant: op=('forall'|'exists') name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
+LtolQuant: op=(BIGAND|BIGOR) name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
 
 LtolMod infers Ltol:
     {infer Finally} 'F' phi=CompoundExpr
@@ -152,6 +152,8 @@ ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';
 
 
 hidden terminal WS: /\s+/;
+terminal BIGAND: /\/\\/;
+terminal BIGOR: /\\\//;
 terminal PV: /@([_a-zA-Z][\w_]*)/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal INT returns number: /[0-9]+/;
