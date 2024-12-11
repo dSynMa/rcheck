@@ -129,14 +129,14 @@ Ltol: (quants+=LtolQuant)* CompoundExpr;
 LtolQuant: op=('forall'|'exists') name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
 
 LtolMod infers Ltol:
-    {infer Finally} 'F' phi=CompoundExpr
-    | {infer Globally} 'G' phi=CompoundExpr
-    | {infer Next} 'X' phi=CompoundExpr
+    {infer Finally} 'F' expr=CompoundExpr
+    | {infer Globally} 'G' expr=CompoundExpr
+    | {infer Next} 'X' expr=CompoundExpr
     ;
 
 LtolBase infers Ltol:
-    {infer Diamond} '<<' obs=Obs '>>' phi=CompoundExpr
-    | {infer Box} '[[' obs=Obs ']]' phi=CompoundExpr
+    {infer Diamond} '<<' obs=Obs '>>' expr=CompoundExpr
+    | {infer Box} '[[' obs=Obs ']]' expr=CompoundExpr
     ;
 
 Obs: CompoundObs;
