@@ -1,10 +1,11 @@
-import { beforeAll, describe, expect, test } from "vitest";
+import { readFile } from "fs/promises";
 import { EmptyFileSystem, type LangiumDocument } from "langium";
 import { expandToString as s } from "langium/generate";
 import { parseHelper } from "langium/test";
+import { beforeAll, describe, expect, test } from "vitest";
 import type { Diagnostic } from "vscode-languageserver-types";
-import { createRCheckServices } from "../../src/language/r-check-module.js";
 import { Model, isModel } from "../../src/language/generated/ast.js";
+import { createRCheckServices } from "../../src/language/r-check-module.js";
 
 let services: ReturnType<typeof createRCheckServices>;
 let parse:    ReturnType<typeof parseHelper<Model>>;
@@ -21,10 +22,9 @@ beforeAll(async () => {
 
 describe('Validating', () => {
   
-    test('check no errors', async () => {
-        document = await parse(`
-            person Langium
-        `);
+    test('bigger-example', async () => {
+        const biggerExample = await readFile(`${__dirname}/../../examples/bigger-example.rcp`, "utf8")
+        document = await parse(biggerExample);
 
         expect(
             // here we first check for validity of the parsed document object by means of the reusable function
@@ -35,20 +35,20 @@ describe('Validating', () => {
         ).toHaveLength(0);
     });
 
-    test('check capital letter validation', async () => {
-        document = await parse(`
-            person langium
-        `);
+    // test('check capital letter validation', async () => {
+    //     document = await parse(`
+    //         person langium
+    //     `);
 
-        expect(
-            checkDocumentValid(document) || document?.diagnostics?.map(diagnosticToString)?.join('\n')
-        ).toEqual(
-            // 'expect.stringContaining()' makes our test robust against future additions of further validation rules
-            expect.stringContaining(s`
-                [1:19..1:26]: Person name should start with a capital.
-            `)
-        );
-    });
+    //     expect(
+    //         checkDocumentValid(document) || document?.diagnostics?.map(diagnosticToString)?.join('\n')
+    //     ).toEqual(
+    //         // 'expect.stringContaining()' makes our test robust against future additions of further validation rules
+    //         expect.stringContaining(s`
+    //             [1:19..1:26]: Person name should start with a capital.
+    //         `)
+    //     );
+    // });
 });
 
 function checkDocumentValid(document: LangiumDocument): string | undefined {
