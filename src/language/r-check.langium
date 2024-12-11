@@ -126,7 +126,7 @@ type Expr = BaseExpr | BinExpr | CompoundExpr | Comparison ;
 
 Ltol: (quants+=LtolQuant)* CompoundExpr;
 
-LtolQuant: op=(BIGAND|BIGOR) name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
+LtolQuant: op=('forall'|'exists') name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
 
 LtolMod infers Ltol:
     {infer Finally} 'F' phi=CompoundExpr
@@ -152,8 +152,6 @@ ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';
 
 
 hidden terminal WS: /\s+/;
-terminal BIGAND: /\/\\/;
-terminal BIGOR: /\\\//;
 terminal PV: /@([_a-zA-Z][\w_]*)/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal INT returns number: /[0-9]+/;
