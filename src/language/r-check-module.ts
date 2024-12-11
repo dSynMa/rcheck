@@ -26,7 +26,7 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
 
                 }
             }
-            // Export @-prefixed names for property identifiers
+            // Export @-prefixed names for property variables
             if (isPropVar(childNode)) {
                 exportedDescriptions.push(this.descriptions.createDescription(childNode, "@" + childNode.name, document))
             }

@@ -81,7 +81,7 @@ export class RCheckValidator {
         if (model.propVars?.length == 0) {
             model.specs?.forEach(ltol => { 
                 if (ltol.quants !== undefined && ltol.quants?.length > 0) {
-                    accept("warning", `Quantified formula, but system has no property identifiers`, { node: ltol });
+                    accept("warning", `Quantified formula, but system has no property variables`, { node: ltol });
                 
                 }
             });

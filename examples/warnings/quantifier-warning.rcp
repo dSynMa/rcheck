@@ -16,5 +16,5 @@ SPEC forall k : Agent . F true;
 SPEC F true;
 
 // This example should trigger the following warnings:
-// Quantified formula, but system has no property identifiers [ln 14, Col 6]
-// Quantified formula, but system has no property identifiers [ln 15, Col 6]
+// Quantified formula, but system has no property variables [ln 14, Col 6]
+// Quantified formula, but system has no property variables [ln 15, Col 6]
