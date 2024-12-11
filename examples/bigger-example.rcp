@@ -1,8 +1,8 @@
-channels: a, empty
+channel a, empty
 
 enum msgvals {team, form, assemble}
 
-message-structure: MSG : msgvals, NO : int, LNK : channels
+message-structure: MSG : msgvals, NO : int, LNK : channel
 property-variables: type : 0..3, asgn : bool, rdy : 0..2
 
 guard g1(p : int, b : bool, t : int) := !b & (p==1 -> (t==1 | t==2)) &(p==2 -> (t==1 | t==3));
@@ -10,7 +10,7 @@ guard g1(p : int, b : bool, t : int) := !b & (p==1 -> (t==1 | t==2)) &(p==2 -> (
 guard g2(r : int, s : int) := (r==s);
 
 agent Line
-    local: stage : int, lnk : channels, prd : int
+    local: stage : int, lnk : channel, prd : int
     init: stage == 0 & lnk == a & (prd == 1 | prd == 2)
     relabel:
         type <- 0
@@ -30,7 +30,7 @@ agent Line
             )
 
 agent Robot
-        local: btype : int, lnk : channels, basgn : bool, brdy : 0..2, no  : int
+        local: btype : int, lnk : channel, basgn : bool, brdy : 0..2, no  : int
         init: btype == 1 & lnk == empty & basgn == false & brdy == 0 & no == 0
         relabel:
             type <- btype

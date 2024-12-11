@@ -1,4 +1,4 @@
-channels: ch, ch
+channel ch, ch
 enum msgvals {foo}
 enum msgvals {bar, baz, bar}
 enum myEnum {foo}
@@ -17,7 +17,7 @@ agent Agent
                 myEnum: {counter == 1} ch! true () [counter := 0]
             )
 
-system = Agent(one, true) | Agent(foo, true) | Agent(one, true)
+system = Agent(one, true) || Agent(foo, true) || Agent(one, true)
 
 SPEC F true;
 SPEC forall foo : Agent . true;

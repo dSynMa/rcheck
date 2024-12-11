@@ -3,7 +3,7 @@ grammar RCheck
 entry Model:
     //Global section
     (
-        ('channels' ':' channels+=Channel (',' channels+=Channel)*)
+        ('channel' channel+=Channel (',' channel+=Channel)*)
         | (enums+=Enum)
         | ('message-structure' ':' msgStructs+=MsgStruct (',' msgStructs+=MsgStruct)*)
         | ('property-variables' ':' propVars+=PropVar (',' propVars+=PropVar)*)
@@ -75,7 +75,7 @@ LocationExpr: (location=[LocationExprRef]);
 SupplyLocationExpr: (location=[LocationExprRef] | self="SELF" | any="ANY");
 
 fragment TypedDeclaration: 
-    name=ID ':' (builtinType=('bool'|'int'|'channels'|'location') | customType=[Enum] | rangeType=Range);
+    name=ID ':' (builtinType=('bool'|'int'|'channel'|'location') | customType=[Enum] | rangeType=Range);
 
 Range: lower=INT '..' upper=INT;
 

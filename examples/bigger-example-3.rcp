@@ -1,12 +1,15 @@
-channels: c, empty, g1, g2,vmm1,vmm2,vmm
+channel c, empty, g1, g2,vmm1,vmm2,vmm
+
 enum rolevals {clnt, vm, mgr}
 enum msgvals {reserve, request, release, buy, connect, full}
-message-structure: MSG : msgvals, LNK : channels
+
+message-structure: MSG : msgvals, LNK : channel
 property-variables: cv : rolevals
-guard g(r : rolevals, ch : channels, m : channels) := (chan == *) & (@cv == r) | (chan == ch) & (@cv == mgr) | (chan == m) ;
+
+guard g(r : rolevals, ch : channel, m : channel) := (chan == *) & (@cv == r) | (chan == ch) & (@cv == mgr) | (chan == m) ;
 
 agent Client
-    local: role : rolevals, cLink : channels, mLink : channels, b: location
+    local: role : rolevals, cLink : channel, mLink : channel, b: location
     init: cLink == c & mLink == empty & role==clnt
     relabel:
         cv <- role
@@ -34,7 +37,7 @@ agent Client
             )
 
 agent Manager
-    local: role : rolevals, cLink : channels, sLink : channels, fLink : channels
+    local: role : rolevals, cLink : channel, sLink : channel, fLink : channel
     init: fLink == g1 & sLink == g2 & cLink == c & role==mgr
     relabel:
         cv <- role
@@ -53,7 +56,7 @@ agent Manager
             )
 
 agent Machine
-    local: gLink : channels, pLink : channels, cLink : channels, asgn : bool
+    local: gLink : channel, pLink : channel, cLink : channel, asgn : bool
     init: !asgn & (cLink == empty)
     relabel:
         cv <- vm

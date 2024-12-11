@@ -1,6 +1,5 @@
-channels: chan
+channel ch
 enum a {foo, bar}
-enum channels {bar}
 property-variables: x : bool
 
 agent Agent
@@ -8,7 +7,14 @@ agent Agent
     init: true
 
     repeat: (
-                label: {counter == 0} chan! true () [counter := 1]
+                label: {counter == 0} ch! true () [counter := 1]
             )
 
 system = Agent(one, true) || Agent(two, true) || Agent(three, true)
+
+// This example should trigger the following errors:
+// Expecting token of type 'ID' but found `agent`. [Ln 6, Col 27]
+// Expecting token of type 'repeat' but found `agent`. [Ln 6, Col 27]
+// Expecting token of type 'ID' but found `:`. [Ln 6, col 32]
+// Expecting token of type 'system' but found `:`.
+// TODO this example should also flag 'Agent' [Ln 5] as an invalid name (Issue #17)

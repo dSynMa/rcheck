@@ -1,12 +1,12 @@
-channels: chan
+channel ch
 
 agent Agent
     local: counter : int
     init: counter == 0
 
     repeat: (
-                {counter == 0} chan! true () [counter := 1];
-                {counter == 1} chan! true () [counter := 0]
+                {counter == 0} ch! true () [counter := 1];
+                {counter == 1} ch! true () [counter := 0]
             )
 
 system = Agent(one, true) || Agent(two, true) || Agent(three, true)
