@@ -1,4 +1,4 @@
-channel ch, ch
+enum channel {ch, ch}
 enum msgvals {foo}
 enum msgvals {bar, baz, bar}
 enum myEnum {foo}

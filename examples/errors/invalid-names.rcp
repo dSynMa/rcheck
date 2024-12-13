@@ -1,4 +1,4 @@
-channel ch
+enum channel {ch}
 enum a {foo, bar}
 property-variables: x : bool
 
