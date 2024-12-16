@@ -23,6 +23,7 @@ beforeAll(async () => {
 describe('Parsing tests', () => {
     test('bigger-example', async () => testCorrectFile(`${__dirname}/../../examples/bigger-example.rcp`));
     test('bigger-example-3', async () => testCorrectFile(`${__dirname}/../../examples/bigger-example-3.rcp`));
+    test('duplicates', async () => testCorrectFile(`${__dirname}/../../examples/errors/duplicates.rcp`));
 
 // test('parse simple model', async () => {
 //     document = await parse(`
