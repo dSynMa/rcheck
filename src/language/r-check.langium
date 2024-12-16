@@ -128,7 +128,7 @@ BaseExpr:
 
 type Expr = BaseExpr | BinExpr | CompoundExpr | Comparison ;
 
-Ltol: (quants+=LtolQuant)* CompoundExpr;
+Ltol: (quants+=LtolQuant)* expr=CompoundExpr;
 
 LtolQuant: op=('forall'|'exists') name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
 
