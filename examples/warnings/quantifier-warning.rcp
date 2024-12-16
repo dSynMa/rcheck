@@ -1,4 +1,4 @@
-channel ch
+enum channel {ch}
 
 agent Agent
     local: counter : int

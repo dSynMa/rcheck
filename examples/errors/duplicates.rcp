@@ -1,4 +1,4 @@
-channel ch, ch
+enum channel {ch, ch}
 enum msgvals {foo}
 enum msgvals {bar, baz, bar}
 enum myEnum {foo}
@@ -31,13 +31,13 @@ SPEC forall k : Agent . exists k : Agent . true;
 // Duplicate name 'MSG' [Ln 5, Col 60]
 // Duplicate parameter 'x' [Ln 6, Col 25]
 // Duplicate parameter 'bar' [Ln 6, Col 33]
-// Duplicate name 'foo' [Ln 7, Col 26]
+// Duplicate name 'foo' [Ln 7, Col 21]
 // Duplicate name 'g' [Ln 8, Col 7]
-// Duplicate local variable 'counter' [Ln 12, Col 27]
-// Duplicate local variable 'chan' [Ln 12, Col 42]
-// Duplicate name 'label' [Ln 17, Col 17]
-// Duplicate name 'myEnum' [Ln 18, Col 17]
-// Duplicate name 'foo' [Ln 21, Col 35]
-// Duplicate name 'one' [Ln 21, Col 54]
-// Duplicate name 'foo' [Ln 24, Col 9]
-// Duplicate name 'k' [Ln 25, Col 24]
+// Duplicate local variable 'counter' [Ln 11, Col 27]
+// Duplicate local variable 'ch' [Ln 11, Col 42]
+// Duplicate name 'label' [Ln 16, Col 17]
+// Duplicate name 'myEnum' [Ln 17, Col 17]
+// Duplicate name 'foo' [Ln 20, Col 36]
+// Duplicate name 'one' [Ln 20, Col 56]
+// Duplicate name 'foo' [Ln 23, Col 13]
+// Duplicate name 'k' [Ln 24, Col 32]

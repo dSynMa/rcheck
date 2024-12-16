@@ -1,4 +1,4 @@
-channel a, empty
+enum channel {a, empty}
 
 enum msgvals {team, form, assemble}
 

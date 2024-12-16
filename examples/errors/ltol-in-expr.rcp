@@ -1,4 +1,4 @@
-channel c
+enum channel {c}
 guard g(p : int) := p == (F 3) U false;
 guard g2() := true;
 
