@@ -2,15 +2,28 @@ enum channel {ch}
 enum a {foo, bar}
 property-variables: x : bool
 
-agent Agent
-    local: counter : int, agent: bool, true: int
+agent Process
+    // REPAIR: changed agent name 'Agent' to 'Process'
+    // REPAIR: changed variable name 'agent' to 'b'
+    // REPAIR: changed variable name 'true' to 'n'
+    // REPAIR: added variable 'clink' of type 'channel' ('ch' is a possible value for the 'clink' variable)
+    local: counter:int, b:bool, n:int, clink:channel
     init: true
 
     repeat: (
-                label: {counter == 0} ch! true () [counter := 1]
+                label: {counter == 0} clink! true () [counter := 1]
             )
 
-system = Agent(one, true) || Agent(two, true) || Agent(three, true)
+// REPAIR: changed the instantiation of 'Agent' to the instantiation of the agent 'Process'
+system = Process(one, true) || Process(two, true) || Process(three, true)
+
+// REPAIR: type 'Agent' is recognized in the SPEC because it is declared as a builtinTYpe in the 'LtolQuant'
+// PROBLEM: 'clink' is not recognized as a qualified reference in the scope of the type 'Agent', but it is recognized in the scope of the agent 'Process'
+
+SPEC forall k : Agent . F true;
+SPEC forall k : Agent . F k-clink = ch
+
+SPEC forall k : Process . F k-clink = ch
 
 // This example should trigger the following errors:
 // Expecting token of type 'ID' but found `agent`. [Ln 6, Col 27]
