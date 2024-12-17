@@ -1,0 +1,4 @@
+[submodule "recipe"]
+	path = recipe
+	url = git@github.com:dSynMa/recipe.git
+	branch = rcheck
