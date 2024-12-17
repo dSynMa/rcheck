@@ -130,7 +130,7 @@ type Expr = BaseExpr | BinExpr | CompoundExpr | Comparison ;
 
 Ltol: (quants+=LtolQuant)* expr=CompoundExpr;
 
-LtolQuant: op=('forall'|'exists') name=ID ':' kinds+=[Agent] ('|' kinds+=[Agent])* '.';
+LtolQuant: op=('forall'|'exists') name=ID ':' (builtinType='Agent' | kinds+=[Agent] ('|' kinds+=[Agent])*) '.';
 
 LtolMod infers Ltol:
     {infer Finally} 'F' expr=CompoundExpr
