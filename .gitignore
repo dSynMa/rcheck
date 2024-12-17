@@ -10,3 +10,7 @@ static/monaco-editor-workers/
 static/worker/
 syntaxes/
 dist
+
+
+bin/rcheck-*.jar
+rcheck-*.vsix
