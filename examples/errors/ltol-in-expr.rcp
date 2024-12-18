@@ -2,7 +2,7 @@ enum channel {c}
 guard g(p : int) := p == (F 3) U false;
 guard g2() := true;
 
-agent Agent
+agent Process
     local: counter : int
     init: counter == 0 U counter == 1
 
@@ -11,7 +11,7 @@ agent Agent
                 {F counter == 1} c! true () [counter := X 0]
             )
 
-system = Agent(one, true) || Agent(two, true) || Agent(three, true)
+system = Process(one, true) || Process(two, true) || Process(three, true)
 
 SPEC F true;
 

@@ -7,7 +7,7 @@ guard g(x: int, y: int, x: int, bar: int) := true;
 property-variables: foo : int
 guard g() := true;
 
-agent Agent
+agent Process
     local: counter : int, counter: bool, ch: int
     init: counter == 0
 
@@ -17,7 +17,7 @@ agent Agent
                 myEnum: {counter == 1} ch! true () [counter := 0]
             )
 
-system = Agent(one, true) || Agent(foo, true) || Agent(one, true)
+system = Process(one, true) || Process(foo, true) || Process(one, true)
 
 SPEC F true;
 SPEC forall foo : Agent . true;
