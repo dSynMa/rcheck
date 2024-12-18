@@ -1,5 +1,5 @@
 import { AstNode, AstUtils, NamedAstNode, ValidationAcceptor, ValidationChecks, isAstNode, isNamed } from 'langium';
-import { Agent, Model, RCheckAstType, isAssign, isBinExpr, isBox, isDiamond, isExpr, isFinally, isGlobally, isLocal, isLtolQuant, isNext, isParam, isProcess } from './generated/ast.js';
+import { Agent, Model, RCheckAstType, isAssign, isBox, isCompoundExpr, isDiamond, isExpr, isFinally, isGlobally, isLocal, isLtolQuant, isNext, isParam, isProcess } from './generated/ast.js';
 import type { RCheckServices } from './r-check-module.js';
 
 /**
