@@ -1,5 +1,5 @@
 import { AstNode, AstUtils, NamedAstNode, ValidationAcceptor, ValidationChecks, isAstNode, isNamed } from 'langium';
-import { Agent, Model, RCheckAstType, isAssign, isBinExpr, isBox, isDiamond, isExpr, isFinally, isGlobally, isLocal, isLtolQuant, isNext, isParam, isProcess } from './generated/ast.js';
+import { Agent, Model, RCheckAstType, isAssign, isBox, isCompoundExpr, isDiamond, isExpr, isFinally, isGlobally, isLocal, isLtolQuant, isNext, isParam, isProcess } from './generated/ast.js';
 import type { RCheckServices } from './r-check-module.js';
 
 /**
@@ -20,7 +20,7 @@ function checkForLtol(node: AstNode, accept: ValidationAcceptor): void {
     if (
         isDiamond(node) || isBox(node)
         || isFinally(node) || isGlobally(node) || isNext(node)
-        || (isBinExpr(node) && "RUW".indexOf(node.operator) != -1)
+        || (isCompoundExpr(node) && "RUW".indexOf(node.operator || " ") != -1)
     ) {
         accept("error", "LTOL not allowed here", {node: node})
     }
