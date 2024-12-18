@@ -20,7 +20,7 @@ function checkForLtol(node: AstNode, accept: ValidationAcceptor): void {
     if (
         isDiamond(node) || isBox(node)
         || isFinally(node) || isGlobally(node) || isNext(node)
-        || (isBinExpr(node) && "RUW".indexOf(node.operator) != -1)
+        || (isCompoundExpr(node) && "RUW".indexOf(node.operator || " ") != -1)
     ) {
         accept("error", "LTOL not allowed here", {node: node})
     }
