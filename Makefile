@@ -1,4 +1,4 @@
-PHONY: all build tests
+PHONY: all build tests update_submodules
 
 all: build test package
 
@@ -6,6 +6,8 @@ grammar = src/language/r-check.langium
 src = $(wildcard src/**/*.ts)
 bin = $(wildcard src/**/*.ts)
 jar = rcheck-0.1.jar
+java_src = $(wildcard recipe/src/**/*.java)
+
 test_files = $(wildcard test/**/*.test.ts)
 
 # Extract version number from package.json
@@ -18,10 +20,12 @@ out/extension/main.js:  $(src) $(bin) $(grammar) package.json
 	npm run build
 
 
-bin/$(jar):
+update_submodules:
+	@git submodule update --remote
+
+bin/$(jar): $(java_src)
 	cd recipe && mvn package
 	cp recipe/target/$(jar) $@
-
 
 package: build bin/$(jar) rcheck-$(version).vsix package.json
 
