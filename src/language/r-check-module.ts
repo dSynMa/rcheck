@@ -86,6 +86,10 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
             if (spec.quants !== undefined){
                 for (const quant of spec.quants) {
                     quantMap.set(quant.name, quant.kinds.map(k => k.$refText));
+                    if (quant.anyKind !== undefined) {
+                        // This quantifier uses the catch-all name ("Agent")
+                        quantMap.set(quant.name, model.agents.map(a => a.name));
+                    }
                 }
             }
 
