@@ -1,5 +1,5 @@
 import type { AstNode, AstNodeDescription, LangiumDocument, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
-import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, EMPTY_SCOPE, inject } from 'langium';
+import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, inject } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
 import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isPropVar, isCommand, Command} from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
@@ -8,31 +8,28 @@ import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleCont
 
 
 export class RCheckScopeProvider extends DefaultScopeProvider {
-    override getScope(_: ReferenceInfo): Scope {
-        return EMPTY_SCOPE;
-    }
-}
-
-export class RCheckScopeComputation extends DefaultScopeComputation {
-
-    override async computeExports(document: LangiumDocument): Promise<AstNodeDescription[]> {
-        const exportedDescriptions: AstNodeDescription[] = [];
+    override getScope(context: ReferenceInfo): Scope {
+        const superScope: Scope = super.getScope(context);
+        const globalDescriptions: AstNodeDescription[] = superScope.getAllElements().toArray();
+        const document: LangiumDocument = AstUtils.getDocument(context.container);
         for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
-            // Export enum cases globally
+            // Export enum cases globally (but limited to current file)
             if (isEnum(childNode)) {
                 const enumNode: Enum = childNode as Enum;
                 for(const caseNode of enumNode.cases){
-                    exportedDescriptions.push(this.descriptions.createDescription(caseNode, caseNode.name, document));
-
+                    globalDescriptions.push(this.descriptions.createDescription(caseNode, caseNode.name, document));
                 }
             }
             // Export @-prefixed names for property variables
             if (isPropVar(childNode)) {
-                exportedDescriptions.push(this.descriptions.createDescription(childNode, "@" + childNode.name, document))
+                globalDescriptions.push(this.descriptions.createDescription(childNode, "@" + childNode.name, document))
             }
         }
-        return exportedDescriptions;
+        return this.createScope(globalDescriptions);
     }
+}
+
+export class RCheckScopeComputation extends DefaultScopeComputation {
 
     override async computeLocalScopes(document: LangiumDocument<AstNode>, cancelToken?: CancellationToken | undefined): Promise<PrecomputedScopes> {
         
@@ -150,7 +147,7 @@ export const RCheckModule: Module<RCheckServices, PartialLangiumServices & RChec
     },
     references : {
         ScopeComputation : (services) => new RCheckScopeComputation(services),
-        // ScopeProvider: (services) => new RCheckScopeProvider(services),
+        ScopeProvider: (services) => new RCheckScopeProvider(services)
     }
 };
 
