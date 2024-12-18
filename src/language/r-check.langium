@@ -3,7 +3,6 @@ grammar RCheck
 entry Model:
     //Global section
     (
-        //('channel' channel+=Channel (',' channel+=Channel)*)
         (enums+=Enum)
         | ('message-structure' ':' msgStructs+=MsgStruct (',' msgStructs+=MsgStruct)*)
         | ('property-variables' ':' propVars+=PropVar (',' propVars+=PropVar)*)
@@ -68,7 +67,7 @@ type Process = BaseProcess | Rep | Sequence | Choice;
 
 Assign: left=[Target] ':=' right=CompoundExpr;
 
-ChannelExprRef: Channel | Local;
+ChannelExprRef: Case | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
 LocationExprRef: Instance | Local;
 LocationExpr: (location=[LocationExprRef]);
@@ -86,10 +85,9 @@ Range: lower=INT '..' upper=INT;
 fragment Params:
     params+=Param (',' params+=Param)* ;
 
-Target: Local | Channel | Case | Param | MsgStruct | PropVar | Send | Receive | Get | Supply | Instance;
+Target: Local | Case | Param | MsgStruct | PropVar | Send | Receive | Get | Supply | Instance;
 
 Local: TypedDeclaration;
-Channel: name=ID;
 Param: TypedDeclaration;
 MsgStruct: TypedDeclaration;
 PropVar: TypedDeclaration;
