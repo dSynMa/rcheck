@@ -4,12 +4,25 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build r-check",
-            "command": "npm run langium:generate && npm run build",
+            "label": "(MAKE) Build r-check",
+            "command": "make",
             "type": "shell",
             "group": {
                 "kind": "build",
                 "isDefault": true
+            },
+            "detail": "Run 'make'",
+            "icon": {
+                "color": "terminal.ansiGreen",
+                "id": "server-process"
+            }
+        }
+        {
+            "label": "Build r-check",
+            "command": "npm run langium:generate && npm run build",
+            "type": "shell",
+            "group": {
+                "kind": "build"
             },
             "detail": "Langium: Generate grammar and build the r-check language",
             "icon": {
