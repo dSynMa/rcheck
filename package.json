@@ -76,6 +76,14 @@
                 "title": "R-CHECK: Show agents' transition systems"
             }
         ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "rcheck.todot",
+                    "when": "resourceExtname == .rcp"
+                }
+            ]
+        },
         "languages": [
             {
                 "id": "r-check",
