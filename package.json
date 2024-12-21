@@ -70,6 +70,12 @@
         "Programming Languages"
     ],
     "contributes": {
+        "commands": [
+            {
+                "command": "rcheck.todot",
+                "title": "R-CHECK: Show agents' transition systems"
+            }
+        ],
         "languages": [
             {
                 "id": "r-check",

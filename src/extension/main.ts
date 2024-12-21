@@ -1,13 +1,21 @@
-import type { LanguageClientOptions, ServerOptions} from 'vscode-languageclient/node.js';
-import type * as vscode from 'vscode';
 import * as path from 'node:path';
+import * as vscode from 'vscode';
+import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node.js';
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node.js';
+import { Temp } from './temp.js';
+import { ToDot } from './todot.js';
 
 let client: LanguageClient;
+let temp: Temp;
+let todot: ToDot;
 
 // This function is called when the extension is activated.
 export function activate(context: vscode.ExtensionContext): void {
     client = startLanguageClient(context);
+    temp = new Temp();
+    context.subscriptions.push(temp);
+    todot = new ToDot(context, temp);
+    todot.Init(context);
 }
 
 // This function is called when the extension is deactivated.
