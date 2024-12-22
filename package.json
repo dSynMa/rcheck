@@ -1,16 +1,26 @@
 {
     "name": "rcheck",
     "description": "VSCode extension for the R-CHECK specification language",
+    "icon": "icons/icon.png",
     "private": true,
+    "author": {
+        "name": "The R-CHECK team"
+    },
+    "bugs": "https://github.com/dSynMa/rcheck/issues",
     "repository": {
         "type": "git",
-        "url": "https://github.com/dSynMa/rcheck.git"
+        "url": "https://github.com/dSynMa/rcheck"
     },
+    "keywords": [
+        "model-checking", "multi-agent-systems", "reconfiguration", "verification"
+    ],
     "version": "0.0.1",
     "files": [
         "bin",
+        "icons",
         "out",
-        "src"
+        "src",
+        "syntaxes"
     ],
     "type": "module",
     "scripts": {
