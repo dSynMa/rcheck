@@ -27,10 +27,10 @@ bin/$(jar): $(java_src)
 	cd recipe && mvn package
 	cp recipe/target/$(jar) $@
 
-package: build bin/$(jar) rcheck-$(version).vsix package.json
+package: rcheck-$(version).vsix 
 
 
-rcheck-$(version).vsix:
+rcheck-$(version).vsix: package.json bin/$(jar)
 	vsce package
 
 # We need to do this little trick since 'test' is an actual directory name
