@@ -5,15 +5,27 @@ language for reconfigurable interacting systems.
 
 It is based on [Langium](https://langium.org/).
 
-## Instructions
+## Quickstart
+
+```bash
+git clone https://github.com/dSynMa/rcheck.git  # Clones the repo
+cd rcheck 
+git submodule update --remote
+make package
+```
+
+This creates a `.vsix` package in the root directory, which can be installed in
+VSCode by selecting `Extensions: Install from VSIX...` from the command palette.
+
+## Instructions -- debugging
 
 We assume that Langium is already installed.
 
 ```bash
 git clone https://github.com/dSynMa/rcheck.git  # Clones the repo
 cd rcheck 
-npm install
-npm run langium:generate && npm run build  # Generates syntaxes, scripts, etc.
+git submodule update --remote
+make all
 code .  # Opens repository in VS Code
 ```
 
