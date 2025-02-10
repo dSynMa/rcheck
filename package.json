@@ -84,12 +84,20 @@
             {
                 "command": "rcheck.todot",
                 "title": "R-CHECK: Show agents' transition systems"
+            },
+            {
+                "command": "rcheck.verify",
+                "title": "R-CHECK: Model-check using IC3"
             }
         ],
         "menus": {
             "commandPalette": [
                 {
                     "command": "rcheck.todot",
+                    "when": "resourceExtname == .rcp"
+                },
+                {
+                    "command": "rcheck.verify",
                     "when": "resourceExtname == .rcp"
                 }
             ]
