@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
+import { jarCallback } from "./common.js";
 
 let temp: Temp
-let jarPath: string
 let hasgv: boolean 
 let hasdot: boolean
 const execPromise = promisify(execFile);
@@ -18,9 +18,7 @@ const graphvizInteractiveCmdName = "graphviz-interactive-preview.preview.beside"
  */
 export class ToDot {
     constructor(context: vscode.ExtensionContext, t: Temp) {
-        jarPath = context.asAbsolutePath(path.join('bin', 'rcheck-0.1.jar'));
         temp = t
-        // check whether the graphviz interactive extension is installed/enabled
         hasgv = vscode.extensions.all.some((x) => x.id.includes(graphvizInteractiveExtensionId));
         hasdot = false;
         if (!hasgv) {
@@ -34,25 +32,24 @@ export class ToDot {
      * @param context The ExtensionContext for our extension
      */
     Init(context: vscode.ExtensionContext): void {
+        const args = ["--dot", "-tmp"]
         context.subscriptions.push(
-            vscode.commands.registerCommand('rcheck.todot', callback)
+            vscode.commands.registerCommand('rcheck.todot', () => jarCallback(context, args, check, dotCallback))
         );
     }
 }
 
-async function callback() {
+function check() {
     if (!hasgv && !hasdot) {
         vscode.window.showErrorMessage(
             "This command requires either the GraphViz Interactive Preview extension or the Graphviz package.");
-            return;
     }
-    const args = ["-jar", jarPath, "-i", vscode.window.activeTextEditor?.document.fileName!, "--dot", "-tmp"]
-    execFile("java", args, dotCallback);
-};
-
+    return hasgv || hasdot;
+}
 
 function dotCallback(err: ExecFileException | null, _: string, stderr: string) {
     if (err) {
+        vscode.window.showErrorMessage("!!");
         vscode.window.showErrorMessage(err.message);
         return;
     }
