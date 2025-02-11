@@ -17,7 +17,7 @@ const graphvizInteractiveCmdName = "graphviz-interactive-preview.preview.beside"
  * (Generate/show DOT transition systems for all agents)
  */
 export class ToDot {
-    constructor(context: vscode.ExtensionContext, t: Temp) {
+    constructor(t: Temp) {
         temp = t
         hasgv = vscode.extensions.all.some((x) => x.id.includes(graphvizInteractiveExtensionId));
         hasdot = false;

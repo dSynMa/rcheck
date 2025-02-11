@@ -15,7 +15,7 @@ let tmpDirName: string
 const execPromise = promisify(execFile);
 
 export class Verify {
-    constructor(context: vscode.ExtensionContext, t: Temp, chan: vscode.OutputChannel) {
+    constructor(t: Temp, chan: vscode.OutputChannel) {
         channel = chan;
         temp = t;
         (async () => await execPromise("which", ["nuxmv"]).then(() => hasnuxmv = true, (err) => hasnuxmv = false))();
@@ -155,6 +155,5 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
             }
         });
         temp.addChild(fname, child);
-        
     });
 }

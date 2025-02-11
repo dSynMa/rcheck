@@ -5,8 +5,10 @@ import path from "path";
 import { Disposable } from "vscode";
 
 /**
- * Simple tracker of temporary files/directories, which
- * will be deleted when the object is disposed.
+ * Simple tracker of temporary files/directories/processes, which
+ * will be deleted/killed when the object is disposed. This, in turn,
+ * should happen automatically when the extension deactivates (e.g., when
+ * VSCode closes normally).
  */
 export class Temp implements Disposable {
     tmpFiles: Set<string>;
@@ -24,7 +26,7 @@ export class Temp implements Disposable {
     makeDir(prefix: string) {
         const newDir = mkdtempSync(path.join(tmpdir(), prefix));
         this.addDir(newDir);
-        return newDir
+        return newDir;
     }
 
     addChild(name: string, child: ChildProcess){
