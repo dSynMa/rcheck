@@ -1,5 +1,7 @@
 import { ChildProcess } from "child_process";
-import { rmdir, unlink } from "fs";
+import { mkdtempSync, rmdir, unlink } from "fs";
+import { tmpdir } from "os";
+import path from "path";
 import { Disposable } from "vscode";
 
 /**
@@ -19,6 +21,11 @@ export class Temp implements Disposable {
 
     addFile(fileName: string) { this.tmpFiles.add(fileName); }
     addDir(dirName: string) { this.tmpDirs.add(dirName); }
+    makeDir(prefix: string) {
+        const newDir = mkdtempSync(path.join(tmpdir(), prefix));
+        this.addDir(newDir);
+        return newDir
+    }
 
     addChild(name: string, child: ChildProcess){
         const children = this.children.get(name) || [];
