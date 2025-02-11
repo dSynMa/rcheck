@@ -6,7 +6,6 @@ import { Temp } from "./temp.js";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { integer } from "vscode-languageserver";
-import { ChildProcess } from "node:child_process";
 import { jarCallback } from "./common.js";
 
 let temp: Temp
@@ -15,18 +14,6 @@ let channel: vscode.OutputChannel
 let smvFile: string
 let tmpDirName: string
 const execPromise = promisify(execFile);
-
-class Cancel {
-    children: ChildProcess[] = []
-    Push(child: ChildProcess) {
-        this.children.push(child);
-    }
-    Cancel() {
-        this.children.forEach((c) => c.kill());
-        this.children = []
-    }
-
-}
 
 export class Verify {
     constructor(context: vscode.ExtensionContext, t: Temp, chan: vscode.OutputChannel) {
@@ -82,16 +69,12 @@ async function grepCallback(err: ExecFileException | null, stdout: string, _: st
     const specs = stdout.trim().replace("\n", "").split("--").slice(1)
     channel.show();
     channel.appendLine("Model checking...");
-    const canc = new Cancel();
-    // new Promise(f => setTimeout(f, 20000)).then(() => canc.Cancel());
-    // await new Promise(f => setTimeout(f, 100)).then(() => channel.appendLine("Model checking..."));
     Promise
-        .all(specs.map((element, index) => ic3(smvFile, index, element, canc)))
+        .all(specs.map((element, index) => ic3(smvFile, index, element)))
         .then((x) => { x.forEach((a) => channel.appendLine(a || ""))})
         // .catch((x) => channel.appendLine(x))
-        .then(() => channel.appendLine("Done."));
-    
-    // channel.appendLine("Done");
+        .then(() => channel.appendLine("Done."))
+        .then(() => temp.cancel(smvFile));
 }
 
 /**
@@ -100,7 +83,7 @@ async function grepCallback(err: ExecFileException | null, stdout: string, _: st
  * @param index Index of property being verified
  * @param spec The full text of the LTLSPEC being verified
  */
-function ic3(fname: string, index: integer, spec: string, canc: Cancel, build_boolean_model: boolean=false) {
+function ic3(fname: string, index: integer, spec: string, build_boolean_model: boolean=false) {
     const split = spec.split("LTLSPEC").map((x) => x.trim());
     // TODO a.  In some cases build_boolean_model is not needed and will actually
     //          make the entire script fail, must detect & retry without it
@@ -120,7 +103,7 @@ function ic3(fname: string, index: integer, spec: string, canc: Cancel, build_bo
         const child = execFile("nuxmv", ["-source", script, fname], async (err,stdout,stderr) => {
             if (err) {
                 if (err.message.indexOf("The boolean model must be built") > -1) {
-                    await ic3(fname, index, spec, canc, true).then(resolve, reject);
+                    await ic3(fname, index, spec, true).then(resolve, reject);
                 }
                 else {
                     vscode.window.showErrorMessage(err.message);
@@ -128,9 +111,8 @@ function ic3(fname: string, index: integer, spec: string, canc: Cancel, build_bo
                 }
             } else {
                 const stderrTrim = stderr.trim();
-                // channel.appendLine(stderrTrim);
                 if (stderrTrim && stderrTrim.indexOf("The boolean model must be built") > -1) {
-                    await ic3(fname, index, spec, canc, true).then(resolve, reject);
+                    await ic3(fname, index, spec, true).then(resolve, reject);
                 }
                 else {
                     if (stderrTrim) { vscode.window.showWarningMessage(stderrTrim); }
@@ -138,7 +120,7 @@ function ic3(fname: string, index: integer, spec: string, canc: Cancel, build_bo
                 }
             }
             });
-        canc.Push(child);
+        temp.addChild(fname, child);
         
     });
 }
