@@ -20,7 +20,6 @@ export async function jarCallback(
         jarPath = context.asAbsolutePath(join('bin', 'rcheck-0.1.jar'));
     }
     if (!guard()) return;
-    const path = getCurrentRcpFile()!.toString();
-    const args_ = ["-jar", jarPath, "-i", path].concat(args);
+    const args_ = ["-jar", jarPath].concat(args);
     execFile("java", args_, then);
 }

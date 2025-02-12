@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
-import { jarCallback } from "./common.js";
+import { getCurrentRcpFile, jarCallback } from "./common.js";
 
 let temp: Temp
 let hasnuxmv: boolean
@@ -26,13 +26,14 @@ export class Verify {
      * @param context The ExtensionContext for our extension
      */
     Init(context: vscode.ExtensionContext): void {
-        const args = ["--smv", "-tmp"]
-        context.subscriptions.push(
-            vscode.commands.registerCommand(
-                'rcheck.verify', 
-                () => jarCallback(context, args, check, smvCallback))
-        );
         tmpDirName = temp.makeDir("rcheck-");
+        context.subscriptions.push(
+            vscode.commands.registerCommand('rcheck.verify', () => {
+                const rcpPath = getCurrentRcpFile()!;
+                const args = ["-i", rcpPath, "--smv", "-tmp"]
+                jarCallback(context, args, check, smvCallback)
+            })
+        );
     }
 }
 

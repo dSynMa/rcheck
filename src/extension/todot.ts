@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
-import { jarCallback } from "./common.js";
+import { getCurrentRcpFile, jarCallback } from "./common.js";
 
 let temp: Temp
 let hasgv: boolean 
@@ -32,9 +32,12 @@ export class ToDot {
      * @param context The ExtensionContext for our extension
      */
     Init(context: vscode.ExtensionContext): void {
-        const args = ["--dot", "-tmp"]
         context.subscriptions.push(
-            vscode.commands.registerCommand('rcheck.todot', () => jarCallback(context, args, check, dotCallback))
+            vscode.commands.registerCommand('rcheck.todot', () => {
+                const path = getCurrentRcpFile()!.toString();
+                const args = ["-i", path, "--dot", "-tmp"]
+                jarCallback(context, args, check, dotCallback)
+            })
         );
     }
 }
