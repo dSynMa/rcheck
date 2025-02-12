@@ -29,16 +29,46 @@ export class Temp implements Disposable {
         return newDir;
     }
 
+    /**
+     * Register a child process under `name`.
+     * @param name A name that will be used to retrieve `child` later.
+     * @param child A `ChildProcess`.
+     */
     addChild(name: string, child: ChildProcess){
         const children = this.children.get(name) || [];
         children.push(child);
         this.children.set(name, children);
     }
+
+    /** 
+     * Stop tracking a (terminated) child process.
+     * If the process is still running, this method does nothing.
+     * @param name Name under which child is registered
+     * @param child The (terminated) child process
+     */
+    rmChild(name: string, child: ChildProcess) {
+        const children = this.children.get(name);
+        // Only go ahead if child a) may be registered under name and 
+        // b) has terminated
+        if (children && child.exitCode != null){
+            const index = children?.findIndex((c) => c.pid == child.pid);
+            if (index > -1){
+                this.children.set(name, children.splice(index, 1));
+            }
+        }
+    }
     
+    /**
+     * Kill all children processes registered under `name`.
+     * @param name The name under which the processes are registered.
+     */
     cancel(name: string) {
         const children = this.children.get(name) || [];
         children.forEach((child) => child.kill());
-        this.children.delete(name);
+        children.forEach((child) => this.rmChild(name, child));
+        if (this.children.get(name)?.length == 0) {
+            this.children.delete(name);
+        }
     }
 
     dispose() {
