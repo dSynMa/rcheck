@@ -1,24 +1,26 @@
 import { execFile, ExecFileException } from "child_process";
 import * as path from 'node:path';
-import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
 import { getCurrentRcpFile, jarCallback } from "./common.js";
+import { parseToJson } from "../language/util.js";
 
 let temp: Temp
 let hasnuxmv: boolean
 let channel: vscode.OutputChannel
 let smvFile: string
 let tmpDirName: string
-const execPromise = promisify(execFile);
 
 export class Verify {
     constructor(t: Temp, chan: vscode.OutputChannel) {
         channel = chan;
         temp = t;
-        (async () => await execPromise("which", ["nuxmv"]).then(() => hasnuxmv = true, (err) => hasnuxmv = false))();
+        (async () => await execFile("which", ["nuxmv"], (err, _) => {
+            if (err) { hasnuxmv = false; }
+            else { hasnuxmv = true; }
+        }))();
     }
 
     /**
@@ -28,9 +30,13 @@ export class Verify {
     Init(context: vscode.ExtensionContext): void {
         tmpDirName = temp.makeDir("rcheck-");
         context.subscriptions.push(
-            vscode.commands.registerCommand('rcheck.verify', () => {
+            vscode.commands.registerCommand('rcheck.verify', async () => {
                 const rcpPath = getCurrentRcpFile()!;
-                const args = ["-i", rcpPath, "--smv", "-tmp"]
+                const parsed = await parseToJson(rcpPath);
+                const tmpJson = path.join(tmpDirName, `${path.basename(rcpPath, ".rcp")}.json`);
+                writeFileSync(tmpJson, parsed);
+                temp.addFile(tmpJson);
+                const args = ["-j", tmpJson, "--smv", "-tmp"]
                 jarCallback(context, args, check, smvCallback)
             })
         );
