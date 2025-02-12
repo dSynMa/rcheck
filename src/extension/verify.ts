@@ -72,7 +72,7 @@ async function grepCallback(fname:string, err: ExecFileException | null, stdout:
     }
     const specs = stdout.trim().replace("\n", "").split("--").slice(1)
     channel.show();
-    channel.appendLine(`Model checking ${fname}...`);
+    channel.appendLine(`[${fname}] Model checking started...`);
     const title = `R-CHECK: Verification of ${fname}`
     let htmlReport =  `<!DOCTYPE html>
 <html lang="en">
@@ -84,13 +84,16 @@ async function grepCallback(fname:string, err: ExecFileException | null, stdout:
 <body>
     <h1>${title}</h1>`
     
+    let count = 0;
     await Promise
         .all(specs.map(async (element, index) => {
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const x = await ic3(smvFile, index, split[1]);
+            channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
+
             htmlReport = htmlReport.concat(formatOutput(split[0], x));
         }))
-        .then(() => channel.appendLine("Done."));
+        .then(() => channel.appendLine(`[${fname}] Done.`));
     const panel = vscode.window.createWebviewPanel(
         "verificationResults",
         "Verification Results",
@@ -133,6 +136,7 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
         temp.addFile(script);
         writeFileSync(script, smvCommands);
         const child = execFile("nuxmv", ["-source", script, fname], async (err,stdout,stderr) => {
+            temp.rmChild(fname, child);
             if (err) {
                 if (err.message.indexOf("The boolean model must be built") > -1) {
                     // Retry with build_boolean_model
