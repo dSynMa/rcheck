@@ -1,26 +1,21 @@
-import { execFile, ExecFileException } from "child_process";
+import { execFile } from "child_process";
 import * as path from 'node:path';
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
-import { getCurrentRcpFile, jarCallback } from "./common.js";
+import { execPromise, ExecResult, getCurrentRcpFile, runJar } from "./common.js";
 import { parseToJson } from "../language/util.js";
 
 let temp: Temp
-let hasnuxmv: boolean
+// let hasnuxmv: boolean
 let channel: vscode.OutputChannel
-let smvFile: string
 let tmpDirName: string
 
 export class Verify {
     constructor(t: Temp, chan: vscode.OutputChannel) {
         channel = chan;
         temp = t;
-        (async () => await execFile("which", ["nuxmv"], (err, _) => {
-            if (err) { hasnuxmv = false; }
-            else { hasnuxmv = true; }
-        }))();
     }
 
     /**
@@ -36,48 +31,39 @@ export class Verify {
                 const tmpJson = path.join(tmpDirName, `${path.basename(rcpPath, ".rcp")}.json`);
                 writeFileSync(tmpJson, parsed);
                 temp.addFile(tmpJson);
-                const args = ["-j", tmpJson, "--smv", "-tmp"]
-                jarCallback(context, args, check, smvCallback)
+                check()
+                .then(() => runJar(context, ["-j", tmpJson, "--smv", "-tmp"]))
+                .then(findSpecs)
+                .then(value => verifySpecs(rcpPath, value))
+                .catch(vscode.window.showErrorMessage)
             })
         );
     }
 }
 
-function check() {
-    if (!hasnuxmv) {
-        vscode.window.showErrorMessage("This command requires nuxmv.");
-    }
-    return hasnuxmv;
+async function check() {
+    return new Promise<void>((resolve, reject) => {
+        execFile("which", ["nuxmv"], (err, _) => {
+            if (err) {reject("This command requires nuxmv.")}
+            else resolve();
+        });
+    });
 }
 
 /**
  * Process SMV file
  */
-async function smvCallback(err: ExecFileException | null, _: string, stderr: string) {
-    const editor = vscode.window.visibleTextEditors.find((x) => x.document.fileName.endsWith("rcp"));
-    const fname = editor?.document.uri.fsPath.toString()!
-    if (err) {
-        vscode.window.showErrorMessage(err.message);
-        return;
-    }
-    smvFile = stderr.trim();
+async function findSpecs(value: ExecResult) {
+    const smvFile = value.stderr.trim();
     temp.addFile(smvFile);
-
-    execFile(
-        "grep", ["-B", "1", "^LTLSPEC", smvFile],
-        (err, stdout, stderr) => grepCallback(fname, err, stdout, stderr)
-    );
+    return Promise.all([Promise.resolve(smvFile), execPromise("grep", ["-B", "1", "^LTLSPEC", smvFile])]);
 }
 
 /**
  * Launch verification tasks
  */
-async function grepCallback(fname:string, err: ExecFileException | null, stdout: string, _: string) {
-    if (err) {
-        vscode.window.showErrorMessage(err.message);
-        return;
-    }
-    const specs = stdout.trim().replace("\n", "").split("--").slice(1)
+async function verifySpecs(fname:string, v: [string, ExecResult]) {
+    const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
     channel.show();
     channel.appendLine(`[${fname}] Model checking started...`);
     const title = `R-CHECK: Verification of ${fname}`
@@ -95,7 +81,7 @@ async function grepCallback(fname:string, err: ExecFileException | null, stdout:
     await Promise
         .all(specs.map(async (element, index) => {
             const split = element.split("LTLSPEC").map((x) => x.trim());
-            const x = await ic3(smvFile, index, split[1]);
+            const x = await ic3(v[0], index, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
 
             htmlReport = htmlReport.concat(formatOutput(split[0], x));
