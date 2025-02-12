@@ -1,4 +1,4 @@
-PHONY: all build tests update_submodules
+.PHONY: all build tests update_submodules
 
 all: build test package
 
@@ -6,7 +6,7 @@ grammar = src/language/r-check.langium
 src = $(wildcard src/**/*.ts)
 bin = $(wildcard src/**/*.ts)
 jar = rcheck-0.1.jar
-java_src = $(wildcard recipe/src/**/*.java)
+java_src = $(shell find recipe -type f -name '*.java')
 
 test_files = $(wildcard test/**/*.test.ts)
 
