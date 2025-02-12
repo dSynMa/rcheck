@@ -5,6 +5,12 @@ import { ExecFileException } from "node:child_process";
 
 let jarPath: string;
 
+export function getCurrentRcpFile() {
+    const editor = vscode.window.visibleTextEditors.find((x) => x.document.fileName.endsWith("rcp"));
+    const path = editor?.document.uri.fsPath
+    return path;
+}
+
 export async function jarCallback(
     context: vscode.ExtensionContext,
     args: string[],
@@ -14,8 +20,7 @@ export async function jarCallback(
         jarPath = context.asAbsolutePath(join('bin', 'rcheck-0.1.jar'));
     }
     if (!guard()) return;
-    const editor = vscode.window.visibleTextEditors.find((x) => x.document.fileName.endsWith("rcp"));
-    const path = editor?.document.uri.fsPath.toString()!
+    const path = getCurrentRcpFile()!.toString();
     const args_ = ["-jar", jarPath, "-i", path].concat(args);
     execFile("java", args_, then);
 }
