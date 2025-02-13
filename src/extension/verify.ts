@@ -8,7 +8,6 @@ import { execPromise, ExecResult, getCurrentRcpFile, runJar } from "./common.js"
 import { parseToJson } from "../language/util.js";
 
 let temp: Temp
-// let hasnuxmv: boolean
 let channel: vscode.OutputChannel
 let tmpDirName: string
 
@@ -105,7 +104,11 @@ function formatOutput(spec: string, out: string) {
         .filter((x) => !x.startsWith("***") && !x.startsWith("-- no proof or counterexample found"))
         .map((x) => x.trim())
         .filter((x) => x);
-    return `<h2>${spec} ${emoji}</h2><pre>${lines.join("\n")}</pre>`;
+    return `<h2>${spec} ${emoji}</h2>
+<details>
+<summary>Full output</summary>
+<pre>${lines.join("\n")}</pre>
+</details>`;
 }
 
 /**
@@ -116,6 +119,7 @@ function formatOutput(spec: string, out: string) {
  */
 function ic3(fname: string, index: integer, spec: string, build_boolean_model: boolean=false) {
     // TODO If spec starts with G one can use check_property_as_invar_ic3
+    // TODO add optional ic3 bound limit in extension settings
     const smvCommands = `
         set on_failure_script_quits 1
         go_msat
