@@ -28,7 +28,7 @@ export class ToDot {
             vscode.commands.registerCommand('rcheck.todot', async () => {
                 const path = getCurrentRcpFile()!.toString();
                 check()
-                .then(() => runJar(context, ["-i", path, "--dot", "-tmp"]))
+                .then(() => runJar(["-i", path, "--dot", "-tmp"]))
                 .then(dotCallback)
                 .catch(vscode.window.showErrorMessage)
             })

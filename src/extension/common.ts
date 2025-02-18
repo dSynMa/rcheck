@@ -4,6 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "node:util";
 
 let jarPath: string;
+let context: vscode.ExtensionContext;
 
 export const execPromise = promisify(execFile);
 export type ExecResult = {
@@ -11,6 +12,10 @@ export type ExecResult = {
     stderr: string
 }
 
+export function Init(c: vscode.ExtensionContext) {
+    context = c
+    jarPath = context.asAbsolutePath(join('bin', 'rcheck-0.1.jar'));
+}
 
 export function getCurrentRcpFile() {
     const editor = vscode.window.visibleTextEditors.find((x) => x.document.fileName.endsWith("rcp"));
@@ -18,12 +23,7 @@ export function getCurrentRcpFile() {
     return path;
 }
 
-export async function runJar(
-    context: vscode.ExtensionContext,
-    args: string[]) {
-    if (!jarPath) {
-        jarPath = context.asAbsolutePath(join('bin', 'rcheck-0.1.jar'));
-    }
+export async function runJar(args: string[]) {
     const args_ = ["-jar", jarPath].concat(args);
     return execPromise("java", args_);
 }

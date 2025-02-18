@@ -31,7 +31,7 @@ export class Verify {
                 writeFileSync(tmpJson, parsed);
                 temp.addFile(tmpJson);
                 check()
-                .then(() => runJar(context, ["-j", tmpJson, "--smv", "-tmp"]))
+                .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(findSpecs)
                 .then(value => verifySpecs(rcpPath, value))
                 .catch(vscode.window.showErrorMessage)
