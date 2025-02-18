@@ -29,6 +29,15 @@ export class Temp implements Disposable {
         return newDir;
     }
 
+    makeFile(prefix: string, suffix:string="") {
+        const dir = this.makeDir(prefix);
+        const file = path.resolve(path.join(dir, `file${suffix}`));
+        this.addDir(dir);
+        this.addFile(file);
+        
+        return file;
+    }
+
     /**
      * Register a child process under `name`.
      * @param name A name that will be used to retrieve `child` later.
