@@ -4,18 +4,24 @@ import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node.js';
 import { Temp } from './temp.js';
 import { ToDot } from './todot.js';
+import { Verify } from './verify.js';
+import { Init } from './common.js';
 
 let client: LanguageClient;
 let temp: Temp;
 let todot: ToDot;
+let verify: Verify;
 
 // This function is called when the extension is activated.
 export function activate(context: vscode.ExtensionContext): void {
     client = startLanguageClient(context);
     temp = new Temp();
     context.subscriptions.push(temp);
-    todot = new ToDot(context, temp);
+    Init(context);
+    todot = new ToDot(temp);
+    verify = new Verify(temp, client.outputChannel);
     todot.Init(context);
+    verify.Init(context);
 }
 
 // This function is called when the extension is deactivated.

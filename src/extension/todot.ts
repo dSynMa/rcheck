@@ -1,14 +1,11 @@
-import { execFile, ExecFileException } from "child_process";
+import { execFile } from "child_process";
 import * as path from 'node:path';
-import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
+import { execPromise, ExecResult, getCurrentRcpFile, runJar } from "./common.js";
 
 let temp: Temp
-let jarPath: string
-let hasgv: boolean 
-let hasdot: boolean
-const execPromise = promisify(execFile);
+let hasgv: boolean
 const graphvizInteractiveExtensionId = "tintinweb.graphviz-interactive-preview";
 const graphvizInteractiveCmdName = "graphviz-interactive-preview.preview.beside";
 
@@ -17,16 +14,9 @@ const graphvizInteractiveCmdName = "graphviz-interactive-preview.preview.beside"
  * (Generate/show DOT transition systems for all agents)
  */
 export class ToDot {
-    constructor(context: vscode.ExtensionContext, t: Temp) {
-        jarPath = context.asAbsolutePath(path.join('bin', 'rcheck-0.1.jar'));
-        temp = t
-        // check whether the graphviz interactive extension is installed/enabled
+    constructor(t: Temp) {
+        temp = t;
         hasgv = vscode.extensions.all.some((x) => x.id.includes(graphvizInteractiveExtensionId));
-        hasdot = false;
-        if (!hasgv) {
-            // Check whether dot is installed
-            (async () => await execPromise("dot", ["--version"]).then(() => hasdot = true, (err) => hasdot = false))();
-        }
     }
 
     /**
@@ -35,29 +25,30 @@ export class ToDot {
      */
     Init(context: vscode.ExtensionContext): void {
         context.subscriptions.push(
-            vscode.commands.registerCommand('rcheck.todot', callback)
+            vscode.commands.registerCommand('rcheck.todot', async () => {
+                const path = getCurrentRcpFile()!.toString();
+                check()
+                .then(() => runJar(["-i", path, "--dot", "-tmp"]))
+                .then(dotCallback)
+                .catch(vscode.window.showErrorMessage)
+            })
         );
     }
 }
 
-async function callback() {
-    if (!hasgv && !hasdot) {
-        vscode.window.showErrorMessage(
-            "This command requires either the GraphViz Interactive Preview extension or the Graphviz package.");
-            return;
+async function check() {
+    if (hasgv) {
+        return Promise.resolve();
     }
-    const args = ["-jar", jarPath, "-i", vscode.window.activeTextEditor?.document.fileName!, "--dot", "-tmp"]
-    execFile("java", args, dotCallback);
-};
+    return execPromise("dot", ["--version"]).then(
+        (_) => Promise.resolve(),
+        (__) => Promise.reject("This command requires either the GraphViz Interactive Preview extension or the Graphviz package."))
+}
 
-
-function dotCallback(err: ExecFileException | null, _: string, stderr: string) {
-    if (err) {
-        vscode.window.showErrorMessage(err.message);
-        return;
-    }
+function dotCallback(value: ExecResult) {
+    
     // Get names of .dot files
-    const dotfiles = stderr.split('\n').map((f) => f.trim()).filter((f) => f != '');
+    const dotfiles = value.stderr.split('\n').map((f) => f.trim()).filter((f) => f != '');
 
     dotfiles.forEach(async (f) => {
         temp.addFile(f);
