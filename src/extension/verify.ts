@@ -4,8 +4,9 @@ import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
-import { execPromise, ExecResult, getCurrentRcpFile, runJar } from "./common.js";
+import { execPromise, ExecResult, getCurrentRcpFile, runJar, writePromise } from "./common.js";
 import { parseToJson } from "../language/util.js";
+import { formatStep, formatTransition, renderStep, Step } from "./cex.js";
 
 let temp: Temp
 let channel: vscode.OutputChannel
@@ -33,7 +34,7 @@ export class Verify {
                 check()
                 .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(findSpecs)
-                .then(value => verifySpecs(rcpPath, value))
+                .then(value => verifySpecs(rcpPath, tmpJson, value))
                 .catch(vscode.window.showErrorMessage)
             })
         );
@@ -61,7 +62,7 @@ async function findSpecs(value: ExecResult) {
 /**
  * Launch verification tasks
  */
-async function verifySpecs(fname:string, v: [string, ExecResult]) {
+async function verifySpecs(fname:string, json: string, v: [string, ExecResult]) {
     const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
     channel.show();
     channel.appendLine(`[${fname}] Model checking started...`);
@@ -80,10 +81,9 @@ async function verifySpecs(fname:string, v: [string, ExecResult]) {
     await Promise
         .all(specs.map(async (element, index) => {
             const split = element.split("LTLSPEC").map((x) => x.trim());
-            const x = await ic3(v[0], index, split[1]);
+            const nuxmvOutput = await ic3(v[0], index, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
-
-            htmlReport = htmlReport.concat(formatOutput(split[0], x));
+            htmlReport = htmlReport.concat(await formatOutput(split[0], json, nuxmvOutput));
         }))
         .then(() => channel.appendLine(`[${fname}] Done.`));
     const panel = vscode.window.createWebviewPanel(
@@ -94,17 +94,43 @@ async function verifySpecs(fname:string, v: [string, ExecResult]) {
     panel.webview.html = htmlReport + "</body></html>";
 }
 
-function formatOutput(spec: string, out: string) {
+async function formatOutput(spec: string, json: string, out: string) {
     const isTrue = out.indexOf("is true") > -1
     const isFalse = out.indexOf("is false") > -1
     const emoji = isTrue ? "✅" : isFalse ? "❌" : "❔"
+    let table = "";
+    if (isFalse) {
+        const cexFile = temp.makeFile("cex", ".txt");
+        // TODO promisify this
+        const tbody = await writePromise(cexFile, out)
+            .then(() => runJar(["-j", json, "-cex", cexFile]))
+            .then((v) => JSON.parse(v.stdout))
+            .then((cex: Step[]) => cex.map(s => {
+                    const tr = (
+                        s.inboundTransition != undefined
+                        ? `<tr><td></td><td>${formatTransition(s.inboundTransition)}</td></tr>`
+                        : "")
+                    return `${tr}<tr><td>${s.depth}</td><td>${formatStep(renderStep(cex, s))}</td></tr>`
+                }))
+            .then(s => s.join("\n"));
+        table = `
+<table striped bordered hover>
+<thead>
+<tr>
+<th>#Step</th>
+<th>Changed Variables</th>
+</tr>
+</thead>
+<tbody>${tbody}</tbody></table>`
+    }
 
     const lines = out
         .split('\n')
-        .filter((x) => !x.startsWith("***") && !x.startsWith("-- no proof or counterexample found"))
-        .map((x) => x.trim())
-        .filter((x) => x);
+        .filter(x => !x.startsWith("***") && !x.startsWith("-- no proof or counterexample found"))
+        .map(x => x.trim())
+        .filter(x => x);
     return `<h2>${spec} ${emoji}</h2>
+${table}
 <details>
 <summary>Full output</summary>
 <pre>${lines.join("\n")}</pre>
