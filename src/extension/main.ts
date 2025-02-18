@@ -5,6 +5,7 @@ import { LanguageClient, TransportKind } from 'vscode-languageclient/node.js';
 import { Temp } from './temp.js';
 import { ToDot } from './todot.js';
 import { Verify } from './verify.js';
+import { Init } from './common.js';
 
 let client: LanguageClient;
 let temp: Temp;
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
     client = startLanguageClient(context);
     temp = new Temp();
     context.subscriptions.push(temp);
+    Init(context);
     todot = new ToDot(temp);
     verify = new Verify(temp, client.outputChannel);
     todot.Init(context);
