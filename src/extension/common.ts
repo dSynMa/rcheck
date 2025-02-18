@@ -2,11 +2,13 @@ import * as vscode from "vscode";
 import { join } from 'node:path';
 import { execFile } from "child_process";
 import { promisify } from "node:util";
+import { writeFile } from "node:fs";
 
 let jarPath: string;
 let context: vscode.ExtensionContext;
 
 export const execPromise = promisify(execFile);
+export const writePromise = promisify(writeFile);
 export type ExecResult = {
     stdout: string,
     stderr: string
