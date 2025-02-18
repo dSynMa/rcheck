@@ -1,22 +1,20 @@
-import type { Model } from '../language/generated/ast.js';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import { RCheckLanguageMetaData } from '../language/generated/module.js';
 import { createRCheckServices } from '../language/r-check-module.js';
-import { extractAstNode, extractDocument, getAstReplacer } from './cli-util.js';
+import { extractDocument } from './cli-util.js';
 import { NodeFileSystem } from 'langium/node';
 import * as url from 'node:url';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { parseToJson } from '../language/util.js';
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
 const packagePath = path.resolve(__dirname, '..', '..', 'package.json');
 const packageContent = await fs.readFile(packagePath, 'utf-8');
 
 export const generateAction = async (fileName: string): Promise<void> => {
-    const services = createRCheckServices(NodeFileSystem).RCheck;
-    const model = await extractAstNode<Model>(fileName, services);
-    const stringified = JSON.stringify(model, getAstReplacer());
+    const stringified = await parseToJson(fileName);
     console.log(stringified);
 };
 

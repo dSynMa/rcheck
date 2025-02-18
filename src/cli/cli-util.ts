@@ -49,31 +49,3 @@ export function extractDestinationAndName(filePath: string, destination: string 
         name: path.basename(filePath)
     };
 }
-
-export const getAstReplacer = () => {
-    /**
-     * Used with JSON.stringify() to make a JSON of a Langium AST.
-     */
-
-    // Extra measure to remove circular references. See
-    // https://stackoverflow.com/a/53731154
-    const seen = new WeakSet();
-    return (key: any, value: any) => {
-        // Remove Langium nodes that we won't need
-        if (
-            key === "references" || key === "$cstNode" || key === "$refNode" ||
-            key === "_ref" || key === "ref"
-            ||
-            key === "$nodeDescription" || key === "_nodeDescription") {
-            return;
-        }
-        // Remove seen nodes
-        if (typeof value === "object" && value !== null) {
-            if (seen.has(value)) {
-                return;
-            }
-            seen.add(value);
-        }
-        return value;
-    };
-};
