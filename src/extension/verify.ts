@@ -78,20 +78,23 @@ async function verifySpecs(fname:string, json: string, v: [string, ExecResult]) 
     <h1>${title}</h1>`
     
     let count = 0;
-    await Promise
+    const html = await Promise
         .all(specs.map(async (element, index) => {
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const nuxmvOutput = await ic3(v[0], index, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
-            htmlReport = htmlReport.concat(await formatOutput(split[0], json, nuxmvOutput));
+            return formatOutput(split[0], json, nuxmvOutput);
         }))
-        .then(() => channel.appendLine(`[${fname}] Done.`));
+        .then(outputs => {
+            channel.appendLine(`[${fname}] Done.`);
+            return `${htmlReport}${outputs.join("")}</body></html>`;
+        });
     const panel = vscode.window.createWebviewPanel(
         "verificationResults",
         "Verification Results",
-        vscode.ViewColumn.One
+        vscode.ViewColumn.Active
     );
-    panel.webview.html = htmlReport + "</body></html>";
+    panel.webview.html = html;
 }
 
 async function formatOutput(spec: string, json: string, out: string) {
@@ -104,13 +107,15 @@ async function formatOutput(spec: string, json: string, out: string) {
         // TODO promisify this
         const tbody = await writePromise(cexFile, out)
             .then(() => runJar(["-j", json, "-cex", cexFile]))
-            .then((v) => JSON.parse(v.stdout))
+            .then(v => JSON.parse(v.stdout), channel.appendLine)
             .then((cex: Step[]) => cex.map(s => {
                     const tr = (
                         s.inboundTransition != undefined
                         ? `<tr><td></td><td>${formatTransition(s.inboundTransition)}</td></tr>`
                         : "")
-                    return `${tr}<tr><td>${s.depth}</td><td>${formatStep(renderStep(cex, s))}</td></tr>`
+                    const fmtLoop = s.___LOOP___ && !s.___DEADLOCK___ ? "<br /><em>Loop starts here</em>" : "";
+                    const fmtDeadlock = s.___DEADLOCK___ ? "<br /><em>Deadlock state</em>" : "";
+                    return `${tr}<tr><td>${s.depth}${fmtLoop}${fmtDeadlock}</td><td>${formatStep(renderStep(cex, s))}</td></tr>`
                 }))
             .then(s => s.join("\n"));
         table = `
