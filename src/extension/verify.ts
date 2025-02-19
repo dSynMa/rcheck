@@ -10,7 +10,6 @@ import { formatStep, formatTransition, renderStep, Step } from "./cex.js";
 
 let temp: Temp
 let channel: vscode.OutputChannel
-let tmpDirName: string
 
 export class Verify {
     constructor(t: Temp, chan: vscode.OutputChannel) {
@@ -23,14 +22,12 @@ export class Verify {
      * @param context The ExtensionContext for our extension
      */
     Init(context: vscode.ExtensionContext): void {
-        tmpDirName = temp.makeDir("rcheck-");
         context.subscriptions.push(
             vscode.commands.registerCommand('rcheck.verify', async () => {
                 const rcpPath = getCurrentRcpFile()!;
                 const parsed = await parseToJson(rcpPath);
-                const tmpJson = path.join(tmpDirName, `${path.basename(rcpPath, ".rcp")}.json`);
+                const tmpJson = temp.makeFile(path.basename(rcpPath, ".rcp"), ".json");
                 writeFileSync(tmpJson, parsed);
-                temp.addFile(tmpJson);
                 check()
                 .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(findSpecs)
@@ -157,14 +154,13 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
         ${build_boolean_model ? "build_boolean_model" : ""}
         check_ltlspec_ic3 -p "${spec}"
         quit`;
-    const script = path.join(tmpDirName, `ltlspec-${index}.smv`);
-    
+    const script = temp.makeFile(`ltlspec-${index}`, ".smv");
 
     return new Promise<string>((resolve, reject) => {
-        temp.addFile(script);
         writeFileSync(script, smvCommands);
         const child = execFile("nuxmv", ["-source", script, fname], async (err,stdout,stderr) => {
             temp.rmChild(fname, child);
+            temp.rm(script);
             if (err) {
                 if (err.message.indexOf("The boolean model must be built") > -1) {
                     // Retry with build_boolean_model
