@@ -80,16 +80,26 @@ export class Temp implements Disposable {
         }
     }
 
+    async rm(fname: string) {
+        if (this.tmpFiles.has(fname)) {
+            unlink(fname, () => {});
+            this.tmpFiles.delete(fname);
+        }
+    }
+
+    async rmDir(dirname: string) {
+        if (this.tmpDirs.has(dirname)) {
+            rmdir(dirname, () => {});
+            this.tmpDirs.delete(dirname);
+        }
+    }
+
     dispose() {
         const awaits: any[] = [];
-        this.tmpFiles.forEach(f => {
-            awaits.push(unlink(f, (_) => { }))
-        });
+        this.tmpFiles.forEach(f => awaits.push(this.rm(f)));
         (async () => await Promise.allSettled(awaits));
 
-        this.tmpDirs.forEach((d) => {
-            awaits.push(rmdir(d, (_) => { }));
-        });
+        this.tmpDirs.forEach(d => awaits.push(this.rmDir(d)));
         (async () => await Promise.allSettled(awaits));
 
         this.children.forEach((_: ChildProcess[], name: string) => this.cancel(name));
