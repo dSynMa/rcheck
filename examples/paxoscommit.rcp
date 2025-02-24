@@ -1,0 +1,40 @@
+enum channel {c, a}
+enum participantState {start, prepared, working, committed, failed, aborted}
+enum task {commit, prepare, abort}
+message-structure: TASK: task
+property-variables: ready: bool
+agent Coordinator
+    local: finished : bool
+    init: !finished
+    receive-guard: chan == a
+    repeat: 
+        {!finished} c! (true)(TASK := prepare)[];
+        (
+         {true} c! (@ready)(TASK := commit)[finished := true]
+           +
+         ({true} a? [];
+          {true} c! (true)(TASK := abort)[finished := true]
+         )
+        )
+agent Participant
+    local: state : participantState
+    init: state == start
+    relabel:
+       ready <- false
+    receive-guard: chan == c
+    repeat:
+         {state == start & TASK == prepare} c? [state := working];
+        (({true} *! (true)()[state := prepared];
+            {true} c? [state := committed]
+            )
+            +
+          ({true} a! (true)()[state := failed]
+            +
+          {TASK == abort} a? [state := aborted])
+        )
+system = Coordinator(coordinator, true) || Participant(participant1, true) || Participant(participant2, true)
+SPEC F G (coordinator-finished)
+
+
+
+
