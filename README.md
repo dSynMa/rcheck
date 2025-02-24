@@ -5,7 +5,7 @@ language for reconfigurable interacting systems.
 
 It is based on [Langium](https://langium.org/).
 
-## Quickstart
+## Quickstart — installation
 
 ```bash
 git clone https://github.com/dSynMa/rcheck.git  # Clones the repo
@@ -17,7 +17,19 @@ make package
 This creates a `.vsix` package in the root directory, which can be installed in
 VSCode by selecting `Extensions: Install from VSIX...` from the command palette.
 
-## Instructions -- debugging
+## Quickstart — usage
+
+The extension should activate as soon as an `.rcp` file is opened.
+Folder `example` contains a number of sample files.
+
+The extension provides the following commands from the command palette (`Ctrl-R` or `Cmd-R` depending on the operating system):
+
+* *R-CHECK: Show agents' transition systems*: This will visualize the behaviour of each agent in the current system as a symbolic automaton. Requires either the [Graphviz Interactive Preview extension](https://marketplace.visualstudio.com/items?itemName=tintinweb.graphviz-interactive-preview) (recommended), or the [`graphviz`](https://graphviz.org/) software package.
+
+* *R-CHECK: Model-check using IC3*: This will model check all specifications in the current file. Requires the [`nuxmv`](https://nuxmv.fbk.eu/) tool.
+
+
+## Instructions — debugging
 
 We assume that Langium is already installed.
 
@@ -36,7 +48,8 @@ This will open a new VS Code window with the extension pre-loaded.
 
 ## References 
 
-[1] Yehia Abd Alrahman, Shaun Azzopardi, Luca Di Stefano, and Nir Piterman. 2023. Language support for verifying reconfigurable interacting systems. Int J Softw Tools Technol Transfer (November 2023). https://doi.org/10.1007/s10009-023-00729-8
+[1] Yehia Abd Alrahman, Shaun Azzopardi, Luca Di Stefano, and Nir Piterman. Language support for verifying reconfigurable interacting systems. Int J Softw Tools Technol Transfer 25 (2023). https://doi.org/10.1007/s10009-023-00729-8
 
-[2] Yehia Abd Alrahman and Nir Piterman. 2021. Modelling and verification of reconfigurable multi-agent systems. Auton. Agents Multi Agent Syst. 35, 2 (2021), 47. https://doi.org/10.1007/s10458-021-09521-x
+[2] Yehia Abd Alrahman and Nir Piterman. Modelling and verification of reconfigurable multi-agent systems. Auton. Agents Multi Agent Syst. 35, 2 (2021). https://doi.org/10.1007/s10458-021-09521-x
 
+[3] Yehia Abd Alrahman, Shaun Azzopardi, Luca Di Stefano, and Nir Piterman. Attributed Point-to-Point Communication in R-CHECK. In ISoLA'24. LNCS vol. 15220, Springer, 2024. https://doi.org/10.1007/978-3-031-75107-3_20
