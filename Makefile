@@ -19,7 +19,6 @@ out/extension/main.js:  $(src) $(bin) $(grammar) package.json
 	npm run langium:generate
 	npm run build
 
-
 update_submodules:
 	@git submodule update --remote
 
@@ -29,8 +28,7 @@ bin/$(jar): $(java_src)
 
 package: rcheck-$(version).vsix 
 
-
-rcheck-$(version).vsix: package.json bin/$(jar)
+rcheck-$(version).vsix: package.json out/extension/main.js bin/$(jar)
 	vsce package
 
 # We need to do this little trick since 'test' is an actual directory name

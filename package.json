@@ -21,6 +21,7 @@
     "files": [
         "bin",
         "icons",
+        "LICENSE",
         "out",
         "src",
         "syntaxes"
