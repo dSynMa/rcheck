@@ -13,28 +13,23 @@ agent Coordinator
          {true} c! (@ready)(TASK := commit)[finished := true]
            +
          ({true} a? [];
-          {true} c! (true)(TASK := abort)[finished := true]
+          {true} *! (true)(TASK := abort)[finished := true]
          )
         )
 agent Participant
     local: state : participantState
     init: state == start
     relabel:
-       ready <- false
+       ready <- state == prepared
     receive-guard: chan == c
     repeat:
          {state == start & TASK == prepare} c? [state := working];
         (({true} *! (true)()[state := prepared];
-            {true} c? [state := committed]
+            {TASK == commit} c? [state := committed]
             )
             +
-          ({true} a! (true)()[state := failed]
+           {true} a! (true)()[state := failed]
             +
-          {TASK == abort} a? [state := aborted])
-        )
+          {TASK == abort} *? [state := aborted])
 system = Coordinator(coordinator, true) || Participant(participant1, true) || Participant(participant2, true)
 SPEC F G (coordinator-finished)
-
-
-
-
