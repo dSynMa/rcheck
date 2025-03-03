@@ -8,12 +8,12 @@ agent Coordinator
     init: !finished
     receive-guard: chan == a
     repeat: 
-        {!finished} c! (true)(TASK := prepare)[];
+        tellToPrepare: {!finished} c! (true)(TASK := prepare)[];
         (
-         {true} c! (@ready)(TASK := commit)[finished := true]
+         commandCommit: {true} c! (@ready)(TASK := commit)[finished := true]
            +
-         ({true} a? [];
-          {true} *! (true)(TASK := abort)[finished := true]
+         (waitForAbort: {true} a? [];
+           tellAllToAbort: {true} *! (true)(TASK := abort)[finished := true]
          )
         )
 agent Participant
@@ -23,13 +23,21 @@ agent Participant
        ready <- state == prepared
     receive-guard: chan == c
     repeat:
-         {state == start & TASK == prepare} c? [state := working];
-        (({true} *! (true)()[state := prepared];
-            {TASK == commit} c? [state := committed]
+         waitForPrepare: {state == start & TASK == prepare} c? [state := working];
+          ((sendPrepared: {true} *! (true)()[state := prepared];
+             (waitForCommit: {TASK == commit} c? [state := committed]
+             +
+             waitForAbort1: {TASK == abort} *? [state := aborted])
             )
-            +
-           {true} a! (true)()[state := failed]
-            +
-          {TASK == abort} *? [state := aborted])
+          +
+          fail: {true} a! (true)()[state := failed]
+          +
+          waitForAbort2: {TASK == abort} *? [state := aborted]
+	)
+        
 system = Coordinator(coordinator, true) || Participant(participant1, true) || Participant(participant2, true)
+
 SPEC F G (coordinator-finished)
+SPEC forall p : Participant . G ([[chan == a]] (F (p-state == aborted | p-state == failed)))
+SPEC exists p1 : Participant . exists p2 : Participant . F ( p1-state == committed ) & F ( p2-state != committed )
+SPEC forall p1 : Participant . forall p2 : Participant . !(F ( p1-state == committed ) & F ( p2-state != committed ))
