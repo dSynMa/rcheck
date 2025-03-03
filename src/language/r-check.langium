@@ -71,7 +71,7 @@ ChannelExprRef: Case | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
 LocationExprRef: Instance | Local;
 LocationExpr: (location=[LocationExprRef]);
-SupplyLocationExpr: (location=[LocationExprRef] | self="SELF" | any="ANY");
+SupplyLocationExpr: (location=[LocationExprRef] | myself="myself" | any="any");
 
 //fragment TypedDeclaration: 
 //    name=ID ':' (builtinType=('bool'|'int'|'channel'|'location') | customType=[Enum] | rangeType=Range);
@@ -116,6 +116,7 @@ BaseExpr:
     | {infer UMinus} '-' expr=BaseExpr
     | {infer Neg} '!' expr=BaseExpr
     | {infer Ref} currentChannel='chan'
+    | {infer Myself} myself='myself'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
     | {infer BoolLiteral} value=('true'|'false')
