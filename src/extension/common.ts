@@ -2,13 +2,18 @@ import * as vscode from "vscode";
 import { join } from 'node:path';
 import { execFile } from "child_process";
 import { promisify } from "node:util";
-import { writeFile } from "node:fs";
+import { PathOrFileDescriptor, readFile, writeFile } from "node:fs";
 
 let jarPath: string;
 let context: vscode.ExtensionContext;
 
 export const execPromise = promisify(execFile);
 export const writePromise = promisify(writeFile);
+
+const rp = promisify(readFile);
+export async function readPromise(x: PathOrFileDescriptor): Promise<string> {
+    return rp(x, {encoding: "utf-8"});
+}
 export type ExecResult = {
     stdout: string,
     stderr: string
@@ -19,8 +24,12 @@ export function Init(c: vscode.ExtensionContext) {
     jarPath = context.asAbsolutePath(join('bin', 'rcheck-0.1.jar'));
 }
 
+export function getCurrentRcpEditor() {
+    return vscode.window.visibleTextEditors.find((x) => x.document.fileName.endsWith("rcp"));
+}
+
 export function getCurrentRcpFile() {
-    const editor = vscode.window.visibleTextEditors.find((x) => x.document.fileName.endsWith("rcp"));
+    const editor = getCurrentRcpEditor();
     const path = editor?.document.uri.fsPath
     return path;
 }
