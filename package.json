@@ -92,6 +92,10 @@
             {
                 "command": "rcheck.verify",
                 "title": "R-CHECK: Model-check using IC3"
+            },
+            {
+                "command": "rcheck.tosmv",
+                "title": "R-CHECK: Show SMV translation"
             }
         ],
         "menus": {
@@ -102,6 +106,10 @@
                 },
                 {
                     "command": "rcheck.verify",
+                    "when": "resourceExtname == .rcp"
+                },
+                {
+                    "command": "rcheck.tosmv",
                     "when": "resourceExtname == .rcp"
                 }
             ]

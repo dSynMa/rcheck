@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
-import { execPromise, ExecResult, getCurrentRcpFile, runJar, writePromise } from "./common.js";
+import { execPromise, ExecResult, getCurrentRcpFile, readPromise, runJar, writePromise } from "./common.js";
 import { parseToJson } from "../language/util.js";
 import { formatStep, formatTransition, renderStep, Step } from "./cex.js";
 
@@ -18,24 +18,49 @@ export class Verify {
     }
 
     /**
-     * Register the command
+     * Register the commands
      * @param context The ExtensionContext for our extension
      */
     Init(context: vscode.ExtensionContext): void {
         context.subscriptions.push(
             vscode.commands.registerCommand('rcheck.verify', async () => {
                 const rcpPath = getCurrentRcpFile()!;
-                const parsed = await parseToJson(rcpPath);
-                const tmpJson = temp.makeFile(path.basename(rcpPath, ".rcp"), ".json");
-                writeFileSync(tmpJson, parsed);
+                const tmpJson = await toJson(rcpPath);
                 check()
                 .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(findSpecs)
                 .then(value => verifySpecs(rcpPath, tmpJson, value))
                 .catch(vscode.window.showErrorMessage)
+            }),
+            vscode.commands.registerCommand('rcheck.tosmv', async () => {
+                const rcpPath = getCurrentRcpFile()!;
+                toJson(rcpPath)
+                .then((tmpJson) => runJar(["-j", tmpJson, "--smv", "-tmp"]))
+                .then(value => {
+                    const smvFile = value.stderr.trim();
+                    temp.addFile(smvFile);
+                    return smvFile;
+                })
+                .then(readPromise)
+                .then(showSmv);
             })
         );
     }
+}
+
+async function toJson(rcpPath: string) {
+    const parsed = await parseToJson(rcpPath);
+    const tmpJson = temp.makeFile(path.basename(rcpPath, ".rcp"), ".json");
+    writeFileSync(tmpJson, parsed);
+    return tmpJson;
+}
+
+async function showSmv(content: string) {
+    vscode.workspace.openTextDocument({
+        "language": "nuxmv",
+        "content": content
+    })
+    .then(doc => vscode.window.showTextDocument(doc));
 }
 
 async function check() {
