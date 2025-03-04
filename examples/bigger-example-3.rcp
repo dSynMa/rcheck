@@ -18,7 +18,7 @@ agent Client
     repeat: (
             {true} GET@(b) []
             +
-            {true} SUPPLY@(ANY)() []
+            {true} SUPPLY@(any)() []
             +
             (sReserve: {cLink==c} *! g(role,cLink,mLink)(MSG := reserve)[cLink := c]
             +
