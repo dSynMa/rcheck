@@ -9,8 +9,10 @@ It is based on [Langium](https://langium.org/).
 
 ```bash
 git clone https://github.com/dSynMa/rcheck.git  # Clones the repo
-cd rcheck 
+cd rcheck
+git submodule init
 git submodule update --remote
+npm update
 make package
 ```
 
@@ -36,7 +38,9 @@ We assume that Langium is already installed.
 ```bash
 git clone https://github.com/dSynMa/rcheck.git  # Clones the repo
 cd rcheck 
+git submodule init
 git submodule update --remote
+npm update
 make all
 code .  # Opens repository in VS Code
 ```
