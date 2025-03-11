@@ -11,7 +11,7 @@ java_src = $(shell find recipe -type f -name '*.java')
 test_files = $(wildcard test/**/*.test.ts)
 
 # Extract version number from package.json
-version = $(strip $(shell grep version package.json | tr -s ' ' | cut -d' ' -f3 | cut -c2- | rev | cut -c3- | rev))
+version = $(strip $(shell grep version package.json | tr -s ' ' | cut -d' ' -f3 | cut -c2- | tr -d '",'))
 
 build: out/extension/main.js
 
