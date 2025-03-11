@@ -139,8 +139,12 @@ async function formatOutput(spec: string, json: string, out: string) {
                     const fmtDeadlock = s.___DEADLOCK___ ? "<br /><em>Deadlock state</em>" : "";
                     return `${tr}<tr><td>${s.depth}${fmtLoop}${fmtDeadlock}</td><td>${formatStep(renderStep(cex, s))}</td></tr>`
                 }))
+            .catch((e) => {
+                channel.appendLine(e);
+                return [];
+            })
             .then(s => s.join("\n"));
-        table = `
+        table = tbody === "" ? "" : `
 <table striped bordered hover>
 <thead>
 <tr>
