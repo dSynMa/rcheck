@@ -1,0 +1,20 @@
+message-structure: NAME : location
+
+agent Node
+    local: loc1 : location, loc2 : location, stage: 0..1
+    init: loc1 = myself & loc2 = myself & stage = 0
+    receive-guard: (chan == *)
+
+    repeat: (
+        splyName: {true} SUPPLY@(myself) (NAME := myself) [loc2 := NAME]
+        +
+        getName: {true} GET@(loc1) (NAME := myself) [loc2 := NAME]
+        +
+        bcast1: {stage = 0} *! (true) (NAME := loc1) [stage := 1]
+        +
+        bcast2: {stage = 0} *? [loc1 := NAME, stage := 1]
+    )
+
+system = Node(one, true) || Node(two, true)
+
+SPEC X X false;

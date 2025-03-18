@@ -16,7 +16,7 @@ agent Client
     receive-guard: (chan == *) | (chan == cLink)
 
     repeat: (
-            {true} GET@(b) []
+            {true} GET@(b)() []
             +
             {true} SUPPLY@(any)() []
             +

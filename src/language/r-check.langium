@@ -58,7 +58,7 @@ Send:
 Receive: 
     CmdHeader chanExpr=ChannelExpr '?' Update;
 Get: 
-    CmdHeader op='GET@' '(' where=LocationExpr ')' Update ;
+    CmdHeader op='GET@' '(' where=LocationExpr ')' Data Update ;
 Supply: 
     CmdHeader op='SUPPLY@' '(' where=SupplyLocationExpr ')' Data Update ;
 
