@@ -1,0 +1,28 @@
+message-structure: A: bool, B: bool
+
+agent Sender 
+    receive-guard: true
+    init: true
+    repeat: (
+        snd : {true} *! (true) (A := false) []
+    )
+
+agent Re1
+    local: x: bool
+    init: x
+    receive-guard: true
+    repeat: (
+        recv1 : {true} *? [x := A]
+    )
+
+agent Re2
+    local: x: bool, y: bool
+    init: x & y
+    receive-guard: true
+    repeat: (
+        recv2 : {true} *? [x := A, y := B]
+    )
+
+system = Sender(s, true) || Re1(r1, true) || Re2(r2, true)
+
+SPEC X false;
