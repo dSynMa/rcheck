@@ -58,7 +58,7 @@ Send:
 Receive: 
     CmdHeader chanExpr=ChannelExpr '?' Update;
 Get: 
-    CmdHeader op='GET@' '(' where=LocationExpr ')' Data Update ;
+    CmdHeader op='GET@' '(' where=GetLocationExpr ')' Data Update ;
 Supply: 
     CmdHeader op='SUPPLY@' '(' where=SupplyLocationExpr ')' Data Update ;
 
@@ -72,9 +72,8 @@ ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
 LocationExprRef: Instance | Local;
 LocationExpr: (location=[LocationExprRef]);
 SupplyLocationExpr: (location=[LocationExprRef] | myself="myself" | any="any");
+GetLocationExpr: (location=[LocationExprRef] | predicate=CompoundExpr);
 
-//fragment TypedDeclaration: 
-//    name=ID ':' (builtinType=('bool'|'int'|'channel'|'location') | customType=[Enum] | rangeType=Range);
 
 fragment TypedDeclaration: 
     name=ID ':' (builtinType=('bool'|'int'|'location') | customType=[Enum] | rangeType=Range);
