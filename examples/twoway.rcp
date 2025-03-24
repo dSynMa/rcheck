@@ -2,19 +2,15 @@ message-structure: NAME : location
 
 agent Node
     local: loc1 : location, loc2 : location, stage: 0..1
-    init: loc1 = myself & loc2 = myself & stage = 0
+    init: loc2 = myself & stage = 0
     receive-guard: (chan == *)
 
     repeat: (
-        splyName: {true} SUPPLY@(myself) (NAME := myself) [loc2 := NAME]
+        splyName: {true} SUPPLY@(any) (NAME := myself) [loc2 := NAME]
         +
-        getName: {true} GET@(loc1) (NAME := myself) [loc2 := NAME]
-        +
-        bcast1: {stage = 0} *! (true) (NAME := loc1) [stage := 1]
-        +
-        bcast2: {stage = 0} *? [loc1 := NAME, stage := 1]
+        getName: {true} GET@(true) (NAME := myself) [loc2 := NAME]
     )
 
-system = Node(one, true) || Node(two, true)
+system = Node(one, loc1=two) || Node(two, loc1=one)
 
-SPEC X X false;
+SPEC G (one-loc2 != two);
