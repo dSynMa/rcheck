@@ -1,10 +1,12 @@
-import type { AstNode, AstNodeDescription, LangiumDocument, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
+import type { AstNode, AstNodeDescription, LangiumDocument, LangiumSharedCoreServices, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
 import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, inject } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isPropVar, isCommand, Command} from './generated/ast.js';
+import { Enum, Model, QualifiedRef, isEnum, isQualifiedRef, isPropVar, isCommand, Command, RCheckAstType, reflection} from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
 import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
+import { createTypirLangiumServices, initializeLangiumTypirServices, TypirLangiumServices } from 'typir-langium';
+import { RCheckTypeSystem } from './r-check-type-checking.js';
 
 
 export class RCheckScopeProvider extends DefaultScopeProvider {
@@ -127,7 +129,8 @@ export class RCheckScopeComputation extends DefaultScopeComputation {
 export type RCheckAddedServices = {
     validation: {
         RCheckValidator: RCheckValidator
-    }
+    },
+    typir: TypirLangiumServices<RCheckAstType>,
 }
 
 /**
@@ -141,13 +144,16 @@ export type RCheckServices = LangiumServices & RCheckAddedServices
  * declared custom services. The Langium defaults can be partially specified to override only
  * selected services, while the custom services must be fully specified.
  */
-export const RCheckModule: Module<RCheckServices, PartialLangiumServices & RCheckAddedServices> = {
-    validation: {
-        RCheckValidator: () => new RCheckValidator()
-    },
-    references : {
-        ScopeComputation : (services) => new RCheckScopeComputation(services),
-        ScopeProvider: (services) => new RCheckScopeProvider(services)
+export function createRCheckModule(shared: LangiumSharedCoreServices): Module<RCheckServices, PartialLangiumServices & RCheckAddedServices> {
+    return {
+        validation: {
+            RCheckValidator: () => new RCheckValidator(),
+        },
+        typir: () => createTypirLangiumServices(shared, reflection, new RCheckTypeSystem(), { /* customize Typir services here */ }),
+        references: {
+            ScopeComputation: (services) => new RCheckScopeComputation(services),
+            ScopeProvider: (services) => new RCheckScopeProvider(services),
+        },
     }
 };
 
@@ -177,9 +183,10 @@ export function createRCheckServices(context: DefaultSharedModuleContext): {
     const RCheck = inject(
         createDefaultModule({ shared }),
         RCheckGeneratedModule,
-        RCheckModule
+        createRCheckModule(shared),
     );
     shared.ServiceRegistry.register(RCheck);
+    initializeLangiumTypirServices(RCheck, RCheck.typir);
     registerValidationChecks(RCheck);
     return { shared, RCheck };
 }
