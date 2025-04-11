@@ -16,6 +16,7 @@ version = $(strip $(shell grep version package.json | tr -s ' ' | cut -d' ' -f3 
 build: out/extension/main.js
 
 out/extension/main.js:  $(src) $(bin) $(grammar) package.json
+	npm update 
 	npm run langium:generate
 	npm run build
 
