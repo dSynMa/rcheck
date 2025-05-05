@@ -1,8 +1,10 @@
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
 import {
   BinExpr,
+  Case,
   isBinExpr,
   isBoolLiteral,
+  isEnum,
   isLocal,
   isMsgStruct,
   isMyself,
@@ -124,5 +126,19 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     });
   }
 
-  onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {}
+  onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {
+    // TODO fix extension crashing
+    if (isEnum(languageNode)) {
+      typir.factory.Primitives.create({ primitiveName: languageNode.name })
+        .inferenceRule({
+          languageKey: [Local, Param, MsgStruct, PropVar],
+          matching: (node: Local | Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
+        })
+        .inferenceRule({
+          languageKey: [Case],
+          matching: (node: Case) => languageNode === node.$container,
+        })
+        .finish();
+    }
+  }
 }
