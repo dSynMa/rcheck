@@ -127,8 +127,13 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
   }
 
   onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {
-    // TODO fix extension crashing
+    console.log(`Encountered node type: ${languageNode.$type}`);
     if (isEnum(languageNode)) {
+      // Check for duplicate enum definitions. Remove the if statement to encounter language server crash
+      /* if (typir.factory.Primitives.get({ primitiveName: languageNode.name })) {
+        console.log(`Found duplicate enum definition with name ${languageNode.name} in this scope.`);
+        return;
+      } */
       typir.factory.Primitives.create({ primitiveName: languageNode.name })
         .inferenceRule({
           languageKey: [Local, Param, MsgStruct, PropVar],
