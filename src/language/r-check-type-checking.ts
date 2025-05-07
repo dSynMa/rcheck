@@ -4,6 +4,7 @@ import {
   Case,
   isBinExpr,
   isBoolLiteral,
+  isCase,
   isEnum,
   isLocal,
   isMsgStruct,
@@ -44,7 +45,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "int",
       })
       .finish();
-    const typeLocation = typir.factory.Primitives.create({ primitiveName: "location" })
+    typir.factory.Primitives.create({ primitiveName: "location" })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "location",
@@ -55,6 +56,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: SupplyLocationExpr) => node.myself !== undefined || node.any !== undefined,
       })
       .finish();
+    const anyType = typir.factory.Top.create({}).finish();
 
     // Inference rules for binary and unary operators
     const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
@@ -95,13 +97,20 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     for (const operator of ["=", "!=", "=="]) {
       typir.factory.Operators.createBinary({
         name: operator,
-        signatures: [
-          { left: typeInt, right: typeInt, return: typeBool },
-          { left: typeBool, right: typeBool, return: typeBool },
-          { left: typeLocation, right: typeLocation, return: typeBool },
-        ],
+        signature: { left: anyType, right: anyType, return: typeBool },
       })
-        .inferenceRule(binaryInferenceRule)
+        .inferenceRule({
+          ...binaryInferenceRule,
+          validation: (node, _operatorName, _operatorType, accept, typir) =>
+            typir.validation.Constraints.ensureNodeIsEquals(node.left, node.right, accept, (actual, expected) => ({
+              message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
+                node.left.$cstNode?.text
+              }' and '${node.right.$cstNode?.text}' have the different types '${actual.name}' and '${expected.name}'.`,
+              languageNode: node, // Inside the BinaryExpression ...
+              languageProperty: "operator", // ... mark the '==' or '!=' token, i.e. the 'operator' property
+              severity: "warning", // Only issue warning because mismatch returns "false"
+            })),
+        })
         .finish();
     }
 
@@ -117,7 +126,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     typir.Inference.addInferenceRulesForAstNodes({
       Ref: (languageNode) => {
         const ref = languageNode.variable.ref;
-        if (isLocal(ref) || isParam(ref) || isMsgStruct(ref) || isPropVar(ref)) {
+        if (isLocal(ref) || isParam(ref) || isMsgStruct(ref) || isPropVar(ref) || isCase(ref)) {
           return ref;
         } else {
           return InferenceRuleNotApplicable;
@@ -127,14 +136,18 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
   }
 
   onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {
-    console.log(`Encountered node type: ${languageNode.$type}`);
     if (isEnum(languageNode)) {
-      // Check for duplicate enum definitions. Remove the if statement to encounter language server crash
-      /* if (typir.factory.Primitives.get({ primitiveName: languageNode.name })) {
-        console.log(`Found duplicate enum definition with name ${languageNode.name} in this scope.`);
-        return;
-      } */
-      typir.factory.Primitives.create({ primitiveName: languageNode.name })
+      const documentUri = languageNode.$container.$document?.uri;
+      if (documentUri === undefined) {
+        throw new Error("Unable to determine document URI."); // TODO: is error correct solution here?
+      }
+      const enumName = `${documentUri}: ${languageNode.name}`;
+
+      // Return early if a primitive with the same name already exists
+      if (typir.factory.Primitives.get({ primitiveName: enumName })) return;
+
+      // Create new enum type
+      typir.factory.Primitives.create({ primitiveName: enumName })
         .inferenceRule({
           languageKey: [Local, Param, MsgStruct, PropVar],
           matching: (node: Local | Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
