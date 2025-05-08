@@ -35,7 +35,7 @@ Agent:
     'repeat' ':' repeat=Choice
     ;
 
-Relabel: var=[PropVar] '<-' CompoundExpr;
+Relabel: var=[PropVar] '<-' expr=CompoundExpr;
 
 Choice: 
     left=Sequence ({infer Choice.left=current} '+' right=Sequence)*;

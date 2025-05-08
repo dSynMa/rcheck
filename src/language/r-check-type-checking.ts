@@ -1,7 +1,9 @@
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
 import {
   BinExpr,
+  Broadcast,
   Case,
+  ChannelRef,
   isBinExpr,
   isBoolLiteral,
   isCase,
@@ -13,6 +15,7 @@ import {
   isNumberLiteral,
   isParam,
   isPropVar,
+  isRelabel,
   isUMinus,
   Local,
   MsgStruct,
@@ -56,7 +59,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: SupplyLocationExpr) => node.myself !== undefined || node.any !== undefined,
       })
       .finish();
-    const anyType = typir.factory.Top.create({}).finish();
+    const typeAny = typir.factory.Top.create({}).finish();
 
     // Inference rules for binary and unary operators
     const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
@@ -97,7 +100,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     for (const operator of ["=", "!=", "=="]) {
       typir.factory.Operators.createBinary({
         name: operator,
-        signature: { left: anyType, right: anyType, return: typeBool },
+        signature: { left: typeAny, right: typeAny, return: typeBool },
       })
         .inferenceRule({
           ...binaryInferenceRule,
@@ -113,6 +116,23 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         })
         .finish();
     }
+    typir.factory.Operators.createBinary({
+      name: "<-",
+      signature: { left: typeAny, right: typeAny, return: typeAny },
+    })
+      .inferenceRule({
+        filter: isRelabel,
+        matching: () => true,
+        operands: (node) => [node.var.ref!, node.expr], // TODO: take care of "!", find out if this is an issue
+        validation: (node, _operatorName, _operatorType, accept, typir) =>
+          typir.validation.Constraints.ensureNodeIsAssignable(node.expr, node.var.ref, accept, (actual, expected) => ({
+            message: `Variable of type '${expected.name}' cannot be relabeled with expression of type '${actual.name}'.`,
+            languageNode: node,
+            languageProperty: "expr",
+            severity: "error",
+          })),
+      })
+      .finish();
 
     // Unary operators
     typir.factory.Operators.createUnary({ name: "-", signature: { operand: typeInt, return: typeInt } })
@@ -132,6 +152,14 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           return InferenceRuleNotApplicable;
         }
       },
+      PropVarRef: (languageNode) => {
+        const ref = languageNode.variable.ref;
+        if (isPropVar(ref)) {
+          return ref;
+        } else {
+          return InferenceRuleNotApplicable;
+        }
+      },
     });
   }
 
@@ -141,7 +169,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       if (documentUri === undefined) {
         throw new Error("Unable to determine document URI."); // TODO: is error correct solution here?
       }
-      const enumName = `${documentUri}: ${languageNode.name}`;
+      const enumName = `${documentUri}::${languageNode.name}`;
 
       // Return early if a primitive with the same name already exists
       if (typir.factory.Primitives.get({ primitiveName: enumName })) return;
@@ -153,8 +181,14 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           matching: (node: Local | Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
         })
         .inferenceRule({
-          languageKey: [Case],
+          languageKey: Case,
           matching: (node: Case) => languageNode === node.$container,
+        })
+        // TODO: solve the case where no enum named "channel" exists
+        // (always create "channel" enum onInizialize and only extend it here)
+        .inferenceRule({
+          languageKey: [ChannelRef, Broadcast],
+          matching: () => languageNode.name === "channel",
         })
         .finish();
     }
