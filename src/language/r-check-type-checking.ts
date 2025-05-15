@@ -69,7 +69,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: SupplyLocationExpr) => node.myself !== undefined || node.any !== undefined,
       })
       .finish();
-    const typeAny = typir.factory.Top.create({}).finish();
     typir.factory.Primitives.create({ primitiveName: "channel" })
       .inferenceRule({ filter: isChannelRef })
       .inferenceRule({ filter: isBroadcast })
@@ -82,6 +81,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: Enum) => node.name === "channel",
       })
       .finish();
+    const typeAny = typir.factory.Top.create({}).finish();
 
     // Inference rules for binary and unary operators
     const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
@@ -171,9 +171,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         if (isLocal(ref)) {
           return ref;
         } else if (isCase(ref)) {
-          console.log(
-            `While inferring type for case ${ref.name} at position ${ref.$container.$cstNode?.text}, the type of ${ref.$cstNode?.text} was returned`
-          );
           return ref.$container;
         } else if (isParam(ref)) {
           return ref;
@@ -241,7 +238,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         className: agentName,
         fields: languageNode.locals.map((l) => ({
           name: l.name,
-          type: (l.builtinType ?? l.rangeType ?? l.customType?.ref)!,
+          type: l,
         })),
         methods: [],
       })
@@ -251,6 +248,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           matching: (node: Instance) => isAgent(node.agent.ref) && node.agent.ref.name === agentName,
           inputValuesForFields: (_node: Instance) => new Map(),
         })
+        // TODO: field access for repeats (also define them as fields)
         .inferenceRuleForFieldAccess({
           languageKey: QualifiedRef,
           matching: (node: QualifiedRef) => {
@@ -258,7 +256,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
             if (isLtolQuant(qualifier)) return false;
             return qualifier?.agent.ref?.name === agentName;
           },
-          field: (node: QualifiedRef) => node.variable.ref!,
+          field: (node: QualifiedRef) => node.variable.ref!, // TODO: can I get rid of "!"?
         })
         .finish();
     }
