@@ -1,32 +1,42 @@
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
 import {
+  Agent,
   BinExpr,
-  Broadcast,
-  Case,
-  ChannelRef,
+  Enum,
+  Instance,
+  isAgent,
   isBinExpr,
   isBoolLiteral,
+  isBroadcast,
   isCase,
+  isChannelRef,
   isEnum,
+  isGet,
+  isInstance,
   isLocal,
+  isLtolQuant,
   isMsgStruct,
   isMyself,
   isNeg,
   isNumberLiteral,
   isParam,
   isPropVar,
+  isReceive,
   isRelabel,
+  isSend,
+  isSupply,
   isUMinus,
   Local,
   MsgStruct,
   Neg,
   Param,
   PropVar,
+  QualifiedRef,
   RCheckAstType,
   SupplyLocationExpr,
   UMinus,
 } from "./generated/ast.js";
-import { AstNode } from "langium";
+import { assertUnreachable, AstNode } from "langium";
 import { InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand, InferenceRuleNotApplicable } from "typir";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
@@ -60,6 +70,18 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       })
       .finish();
     const typeAny = typir.factory.Top.create({}).finish();
+    typir.factory.Primitives.create({ primitiveName: "channel" })
+      .inferenceRule({ filter: isChannelRef })
+      .inferenceRule({ filter: isBroadcast })
+      .inferenceRule({
+        languageKey: [Local, Param, MsgStruct, PropVar],
+        matching: (node: Local | Param | MsgStruct | PropVar) => node.customType?.ref?.name === "channel",
+      })
+      .inferenceRule({
+        languageKey: Enum,
+        matching: (node: Enum) => node.name === "channel",
+      })
+      .finish();
 
     // Inference rules for binary and unary operators
     const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
@@ -146,10 +168,33 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     typir.Inference.addInferenceRulesForAstNodes({
       Ref: (languageNode) => {
         const ref = languageNode.variable.ref;
-        if (isLocal(ref) || isParam(ref) || isMsgStruct(ref) || isPropVar(ref) || isCase(ref)) {
+        if (isLocal(ref)) {
           return ref;
-        } else {
+        } else if (isCase(ref)) {
+          console.log(
+            `While inferring type for case ${ref.name} at position ${ref.$container.$cstNode?.text}, the type of ${ref.$cstNode?.text} was returned`
+          );
+          return ref.$container;
+        } else if (isParam(ref)) {
+          return ref;
+        } else if (isMsgStruct(ref)) {
+          return ref;
+        } else if (isPropVar(ref)) {
+          return ref;
+        } else if (isSend(ref)) {
           return InferenceRuleNotApplicable;
+        } else if (isReceive(ref)) {
+          return InferenceRuleNotApplicable;
+        } else if (isGet(ref)) {
+          return InferenceRuleNotApplicable;
+        } else if (isSupply(ref)) {
+          return InferenceRuleNotApplicable;
+        } else if (isInstance(ref)) {
+          return ref;
+        } else if (ref === undefined) {
+          return InferenceRuleNotApplicable;
+        } else {
+          assertUnreachable(ref);
         }
       },
       PropVarRef: (languageNode) => {
@@ -165,6 +210,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
   onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {
     if (isEnum(languageNode)) {
+      // Exclude channel enum here
+      if (languageNode.name === "channel") return;
+
       const documentUri = languageNode.$container.$document?.uri;
       if (documentUri === undefined) {
         throw new Error("Unable to determine document URI."); // TODO: is error correct solution here?
@@ -181,14 +229,36 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           matching: (node: Local | Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
         })
         .inferenceRule({
-          languageKey: Case,
-          matching: (node: Case) => languageNode === node.$container,
+          languageKey: Enum,
+          matching: (node: Enum) => languageNode === node,
         })
-        // TODO: solve the case where no enum named "channel" exists
-        // (always create "channel" enum onInizialize and only extend it here)
-        .inferenceRule({
-          languageKey: [ChannelRef, Broadcast],
-          matching: () => languageNode.name === "channel",
+        .finish();
+    }
+
+    if (isAgent(languageNode)) {
+      const agentName = languageNode.name;
+      typir.factory.Classes.create({
+        className: agentName,
+        fields: languageNode.locals.map((l) => ({
+          name: l.name,
+          type: (l.builtinType ?? l.rangeType ?? l.customType?.ref)!,
+        })),
+        methods: [],
+      })
+        .inferenceRuleForClassDeclaration({ languageKey: Agent, matching: (node: Agent) => languageNode === node })
+        .inferenceRuleForClassLiterals({
+          languageKey: Instance,
+          matching: (node: Instance) => isAgent(node.agent.ref) && node.agent.ref.name === agentName,
+          inputValuesForFields: (_node: Instance) => new Map(),
+        })
+        .inferenceRuleForFieldAccess({
+          languageKey: QualifiedRef,
+          matching: (node: QualifiedRef) => {
+            const qualifier = node.instance.ref;
+            if (isLtolQuant(qualifier)) return false;
+            return qualifier?.agent.ref?.name === agentName;
+          },
+          field: (node: QualifiedRef) => node.variable.ref!,
         })
         .finish();
     }
