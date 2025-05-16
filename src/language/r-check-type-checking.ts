@@ -1,6 +1,8 @@
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
 import {
   Agent,
+  AutomatonState,
+  BaseProcess,
   BinExpr,
   Enum,
   Guard,
@@ -12,6 +14,7 @@ import {
   isBroadcast,
   isCase,
   isChannelRef,
+  isChoice,
   isEnum,
   isGet,
   isGuard,
@@ -26,7 +29,9 @@ import {
   isPropVar,
   isReceive,
   isRelabel,
+  isRep,
   isSend,
+  isSequence,
   isSupply,
   isUMinus,
   Local,
@@ -36,6 +41,7 @@ import {
   PropVar,
   QualifiedRef,
   RCheckAstType,
+  Sequence,
   SupplyLocationExpr,
   UMinus,
 } from "./generated/ast.js";
@@ -224,9 +230,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       }
       const enumName = `${documentUri}::${languageNode.name}`;
 
-      // Return early if a primitive with the same name already exists
-      if (typir.factory.Primitives.get({ primitiveName: enumName })) return;
-
       // Create new enum type
       typir.factory.Primitives.create({ primitiveName: enumName })
         .inferenceRule({
@@ -264,10 +267,17 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       const agentName = languageNode.name;
       typir.factory.Classes.create({
         className: agentName,
-        fields: languageNode.locals.map((l) => ({
-          name: l.name,
-          type: l,
-        })),
+        fields: [
+          ...languageNode.locals.map((l) => ({
+            name: l.name,
+            type: l,
+          })),
+          ...this.getProcessNames(languageNode).map((n) => ({
+            name: n,
+            type: "bool",
+          })),
+          { name: "automaton-state", type: "int" },
+        ],
         methods: [],
       })
         .inferenceRuleForClassDeclaration({ languageKey: Agent, matching: (node: Agent) => languageNode === node })
@@ -284,9 +294,39 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
             if (isLtolQuant(qualifier)) return false;
             return qualifier?.agent.ref?.name === agentName;
           },
-          field: (node: QualifiedRef) => node.variable.ref!, // TODO: can I get rid of "!"?
+          field: (node: QualifiedRef) => node.variable.ref!.name!,
+        })
+        .inferenceRuleForFieldAccess({
+          languageKey: AutomatonState,
+          matching: (node: AutomatonState) => languageNode === node.instance.ref?.agent.ref,
+          field: (_node: AutomatonState) => "automaton-state",
         })
         .finish();
     }
+  }
+
+  protected getProcessNames(agent: Agent): string[] {
+    const stack: (BaseProcess | Sequence)[] = [agent.repeat];
+    const processNames: string[] = [];
+
+    while (stack.length !== 0) {
+      const process = stack.pop()!;
+      if (isSend(process) || isReceive(process) || isGet(process) || isSupply(process)) {
+        if (process.name) {
+          processNames.push(process.name);
+        }
+      } else if (isChoice(process) || isSequence(process)) {
+        stack.push(process.left);
+        if (process.right !== undefined) {
+          stack.push(process.right);
+        }
+      } else if (isRep(process)) {
+        stack.push(process.process);
+      } else {
+        assertUnreachable(process);
+      }
+    }
+
+    return processNames;
   }
 }
