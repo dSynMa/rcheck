@@ -28,6 +28,7 @@ import {
   isParam,
   isPropVar,
   isReceive,
+  isRef,
   isRelabel,
   isRep,
   isSend,
@@ -63,15 +64,23 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "bool",
       })
       .finish();
-    const typeInt = typir.factory.Primitives.create({
-      primitiveName: "int",
-    })
+
+    const typeInt = typir.factory.Primitives.create({ primitiveName: "int" })
       .inferenceRule({ filter: isNumberLiteral })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "int",
       })
       .finish();
+
+    // TODO: define range as subtype of 'int'
+    const typeRange = typir.factory.Primitives.create({ primitiveName: "range" })
+      .inferenceRule({
+        languageKey: [Local, Param, MsgStruct, PropVar],
+        matching: (node: Local | Param | MsgStruct | PropVar) => node.rangeType !== undefined,
+      })
+      .finish();
+
     typir.factory.Primitives.create({ primitiveName: "location" })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
@@ -83,6 +92,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: SupplyLocationExpr) => node.myself !== undefined || node.any !== undefined,
       })
       .finish();
+
     typir.factory.Primitives.create({ primitiveName: "channel" })
       .inferenceRule({ filter: isChannelRef })
       .inferenceRule({ filter: isBroadcast })
@@ -95,7 +105,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: (node: Enum) => node.name === "channel",
       })
       .finish();
+
     const typeAny = typir.factory.Top.create({}).finish();
+
+    // TODO: fix this conversion
+    typir.Conversion.markAsConvertible(typeRange, typeInt, "IMPLICIT_EXPLICIT");
 
     // Inference rules for binary and unary operators
     const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
@@ -140,15 +154,29 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       })
         .inferenceRule({
           ...binaryInferenceRule,
-          validation: (node, _operatorName, _operatorType, accept, typir) =>
-            typir.validation.Constraints.ensureNodeIsEquals(node.left, node.right, accept, (actual, expected) => ({
-              message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
-                node.left.$cstNode?.text
-              }' and '${node.right.$cstNode?.text}' have the different types '${actual.name}' and '${expected.name}'.`,
-              languageNode: node, // Inside the BinaryExpression ...
-              languageProperty: "operator", // ... mark the '==' or '!=' token, i.e. the 'operator' property
-              severity: "warning", // Only issue warning because mismatch returns "false"
-            })),
+          // TODO: working, but check out if there is a better way then check for assignability
+          //       (best case: keep IsEquals but do type conversion if available)
+          validation: (node, _operatorName, _operatorType, accept, typir) => {
+            const nodes = [node.left, node.right];
+            if (isRef(node.right) && isInstance(node.right.variable.ref)) {
+              nodes.reverse();
+            }
+            return typir.validation.Constraints.ensureNodeIsAssignable(
+              nodes[0],
+              nodes[1],
+              accept,
+              (actual, expected) => ({
+                message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
+                  node.left.$cstNode?.text
+                }' and '${node.right.$cstNode?.text}' have the different types '${actual.name}' and '${
+                  expected.name
+                }'.`,
+                languageNode: node, // Inside the BinaryExpression ...
+                languageProperty: "operator", // ... mark the '==' or '!=' token, i.e. the 'operator' property
+                severity: "warning", // Only issue warning because mismatch returns "false"
+              })
+            );
+          },
         })
         .finish();
     }
@@ -217,6 +245,18 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         }
       },
     });
+
+    // TODO: maybe this validation rule can be implemented upon class creation
+    typir.validation.Collector.addValidationRulesForAstNodes({
+      Instance: (node, accept, typir) => {
+        const typeBool = typir.factory.Primitives.get({ primitiveName: "bool" })!;
+        typir.validation.Constraints.ensureNodeIsAssignable(node.init, typeBool, accept, () => ({
+          message: "Agent inititalization needs to evaluate to 'bool'.",
+          languageProperty: "init",
+          languageNode: node,
+        }));
+      },
+    });
   }
 
   onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {
@@ -265,7 +305,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
     if (isAgent(languageNode)) {
       const agentName = languageNode.name;
-      typir.factory.Classes.create({
+      const agentType = typir.factory.Classes.create({
         className: agentName,
         fields: [
           ...languageNode.locals.map((l) => ({
@@ -286,7 +326,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           matching: (node: Instance) => isAgent(node.agent.ref) && node.agent.ref.name === agentName,
           inputValuesForFields: (_node: Instance) => new Map(),
         })
-        // TODO: field access for repeats (also define them as fields)
         .inferenceRuleForFieldAccess({
           languageKey: QualifiedRef,
           matching: (node: QualifiedRef) => {
@@ -302,6 +341,16 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           field: (_node: AutomatonState) => "automaton-state",
         })
         .finish();
+
+      // Every agent is also a location
+      // TODO: fix this conversion
+      agentType.addListener((type) => {
+        typir.Conversion.markAsConvertible(
+          type,
+          typir.factory.Primitives.get({ primitiveName: "location" })!,
+          "IMPLICIT_EXPLICIT"
+        );
+      });
     }
   }
 
