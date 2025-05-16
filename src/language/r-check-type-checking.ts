@@ -3,6 +3,8 @@ import {
   Agent,
   BinExpr,
   Enum,
+  Guard,
+  GuardCall,
   Instance,
   isAgent,
   isBinExpr,
@@ -12,6 +14,7 @@ import {
   isChannelRef,
   isEnum,
   isGet,
+  isGuard,
   isInstance,
   isLocal,
   isLtolQuant,
@@ -37,7 +40,12 @@ import {
   UMinus,
 } from "./generated/ast.js";
 import { assertUnreachable, AstNode } from "langium";
-import { InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand, InferenceRuleNotApplicable } from "typir";
+import {
+  InferOperatorWithMultipleOperands,
+  InferOperatorWithSingleOperand,
+  InferenceRuleNotApplicable,
+  NO_PARAMETER_NAME,
+} from "typir";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
   onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
@@ -228,6 +236,26 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         .inferenceRule({
           languageKey: Enum,
           matching: (node: Enum) => languageNode === node,
+        })
+        .finish();
+    }
+
+    if (isGuard(languageNode)) {
+      typir.factory.Functions.create({
+        functionName: languageNode.name,
+        outputParameter: { name: NO_PARAMETER_NAME, type: "bool" },
+        inputParameters: languageNode.params.map((p) => ({ name: p.name, type: p })),
+        associatedLanguageNode: languageNode,
+      })
+        .inferenceRuleForDeclaration({
+          languageKey: Guard,
+          matching: (node: Guard) => languageNode === node,
+        })
+        .inferenceRuleForCalls({
+          languageKey: GuardCall,
+          matching: (node: GuardCall) => languageNode === node.guard.ref,
+          inputArguments: (node: GuardCall) => node.args,
+          validateArgumentsOfFunctionCalls: true,
         })
         .finish();
     }
