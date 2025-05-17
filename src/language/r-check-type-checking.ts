@@ -1,14 +1,20 @@
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
 import {
   Agent,
+  Assign,
   AutomatonState,
   BaseProcess,
   BinExpr,
   Enum,
+  ExistsObs,
+  Finally,
+  ForallObs,
+  Globally,
   Guard,
   GuardCall,
   Instance,
   isAgent,
+  isAssign,
   isBinExpr,
   isBoolLiteral,
   isBroadcast,
@@ -16,10 +22,14 @@ import {
   isChannelRef,
   isChoice,
   isEnum,
+  isExistsObs,
+  isForallObs,
   isGet,
   isGuard,
   isInstance,
+  isLiteralObs,
   isLocal,
+  isLtolMod,
   isLtolQuant,
   isMsgStruct,
   isMyself,
@@ -38,16 +48,19 @@ import {
   Local,
   MsgStruct,
   Neg,
+  Next,
   Param,
   PropVar,
   QualifiedRef,
   RCheckAstType,
+  Relabel,
   Sequence,
   SupplyLocationExpr,
   UMinus,
 } from "./generated/ast.js";
 import { assertUnreachable, AstNode } from "langium";
 import {
+  AnnotatedTypeAfterValidation,
   InferOperatorWithMultipleOperands,
   InferOperatorWithSingleOperand,
   InferenceRuleNotApplicable,
@@ -59,6 +72,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     // Define the primitive types
     const typeBool = typir.factory.Primitives.create({ primitiveName: "bool" })
       .inferenceRule({ filter: isBoolLiteral })
+      .inferenceRule({ filter: isLiteralObs })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "bool",
@@ -73,13 +87,14 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       })
       .finish();
 
-    // TODO: define range as subtype of 'int'
     const typeRange = typir.factory.Primitives.create({ primitiveName: "range" })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.rangeType !== undefined,
       })
       .finish();
+    // TODO: fix this conversion
+    typir.Conversion.markAsConvertible(typeRange, typeInt, "IMPLICIT_EXPLICIT");
 
     typir.factory.Primitives.create({ primitiveName: "location" })
       .inferenceRule({
@@ -108,24 +123,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
     const typeAny = typir.factory.Top.create({}).finish();
 
-    // TODO: fix this conversion
-    typir.Conversion.markAsConvertible(typeRange, typeInt, "IMPLICIT_EXPLICIT");
-
-    // Inference rules for binary and unary operators
+    // Inference rule for binary operators
     const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
       filter: isBinExpr,
       matching: (node: BinExpr, name: string) => node.operator === name,
       operands: (node: BinExpr, _name: string) => [node.left, node.right],
-      validateArgumentsOfCalls: true,
-    };
-    type UnaryExpression = UMinus | Neg;
-    function isUnaryExpression(node: AstNode, _name: string): node is UnaryExpression {
-      return isUMinus(node) || isNeg(node);
-    }
-    const unaryInferenceRule: InferOperatorWithSingleOperand<AstNode, UnaryExpression> = {
-      filter: isUnaryExpression,
-      matching: (node: UnaryExpression, name: string) => node.operator === name,
-      operand: (node: UnaryExpression, _name: string) => node.expr,
       validateArgumentsOfCalls: true,
     };
 
@@ -142,6 +144,15 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       typir.factory.Operators.createBinary({
         name: operator,
         signature: { left: typeInt, right: typeInt, return: typeBool },
+      })
+        .inferenceRule(binaryInferenceRule)
+        .finish();
+    }
+    // TODO: what about 'U' | 'R' | 'W'?
+    for (const operator of ["&", "|", "->"]) {
+      typir.factory.Operators.createBinary({
+        name: operator,
+        signature: { left: typeBool, right: typeBool, return: typeBool },
       })
         .inferenceRule(binaryInferenceRule)
         .finish();
@@ -168,9 +179,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
               (actual, expected) => ({
                 message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
                   node.left.$cstNode?.text
-                }' and '${node.right.$cstNode?.text}' have the different types '${actual.name}' and '${
-                  expected.name
-                }'.`,
+                }' and '${node.right.$cstNode?.text}' have the different types '${this.getTypeName(
+                  actual
+                )}' and '${this.getTypeName(expected)}'.`,
                 languageNode: node, // Inside the BinaryExpression ...
                 languageProperty: "operator", // ... mark the '==' or '!=' token, i.e. the 'operator' property
                 severity: "warning", // Only issue warning because mismatch returns "false"
@@ -187,24 +198,66 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({
         filter: isRelabel,
         matching: () => true,
-        operands: (node) => [node.var.ref!, node.expr], // TODO: take care of "!", find out if this is an issue
+        operands: (node: Relabel) => [node.var.ref!, node.expr], // TODO: take care of "!", find out if this is an issue
         validation: (node, _operatorName, _operatorType, accept, typir) =>
           typir.validation.Constraints.ensureNodeIsAssignable(node.expr, node.var.ref, accept, (actual, expected) => ({
-            message: `Variable of type '${expected.name}' cannot be relabeled with expression of type '${actual.name}'.`,
+            message: `Variable of type '${this.getTypeName(
+              expected
+            )}' cannot be relabeled with expression of type '${this.getTypeName(actual)}'.`,
             languageNode: node,
             languageProperty: "expr",
             severity: "error",
           })),
+        validateArgumentsOfCalls: true,
       })
       .finish();
+    typir.factory.Operators.createBinary({
+      name: ":=",
+      signature: { left: typeAny, right: typeAny, return: typeAny },
+    })
+      .inferenceRule({
+        filter: isAssign,
+        matching: () => true,
+        operands: (node: Assign) => [node.left.ref!, node.right],
+        validation: (node, _operatorName, _operatorType, accept, typir) =>
+          typir.validation.Constraints.ensureNodeIsAssignable(
+            node.right,
+            node.left.ref,
+            accept,
+            (actual, expected) => ({
+              message: `Expression of type '${this.getTypeName(
+                actual
+              )}' cannot be assigned to variable of type '${this.getTypeName(expected)}'.`,
+              languageNode: node,
+              languageProperty: "expr",
+              severity: "error",
+            })
+          ),
+        validateArgumentsOfCalls: true,
+      })
+      .finish();
+
+    // Inference rule for unary opterators
+    type UnaryExpression = UMinus | Neg | Finally | Globally | Next | ForallObs | ExistsObs;
+    const isUnaryExpression = (node: AstNode, _name: string): node is UnaryExpression => {
+      return isUMinus(node) || isNeg(node) || isLtolMod(node) || isForallObs(node) || isExistsObs(node);
+    };
+    const unaryInferenceRule: InferOperatorWithSingleOperand<AstNode, UnaryExpression> = {
+      filter: isUnaryExpression,
+      matching: (node: UnaryExpression, name: string) => node.operator === name,
+      operand: (node: UnaryExpression, _name: string) => node.expr,
+      validateArgumentsOfCalls: true,
+    };
 
     // Unary operators
     typir.factory.Operators.createUnary({ name: "-", signature: { operand: typeInt, return: typeInt } })
       .inferenceRule(unaryInferenceRule)
       .finish();
-    typir.factory.Operators.createUnary({ name: "!", signature: { operand: typeBool, return: typeBool } })
-      .inferenceRule(unaryInferenceRule)
-      .finish();
+    for (const operator of ["!", "F", "G", "X", "forall", "exists"]) {
+      typir.factory.Operators.createUnary({ name: operator, signature: { operand: typeBool, return: typeBool } })
+        .inferenceRule(unaryInferenceRule)
+        .finish();
+    }
 
     // Handle variable references
     typir.Inference.addInferenceRulesForAstNodes({
@@ -249,10 +302,16 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     // TODO: maybe this validation rule can be implemented upon class creation
     typir.validation.Collector.addValidationRulesForAstNodes({
       Instance: (node, accept, typir) => {
-        const typeBool = typir.factory.Primitives.get({ primitiveName: "bool" })!;
         typir.validation.Constraints.ensureNodeIsAssignable(node.init, typeBool, accept, () => ({
           message: "Agent inititalization needs to evaluate to 'bool'.",
           languageProperty: "init",
+          languageNode: node,
+        }));
+      },
+      Ltol: (node, accept, typir) => {
+        typir.validation.Constraints.ensureNodeIsAssignable(node.expr, typeBool, accept, () => ({
+          message: "SPEC needs to evaluate to 'bool'.",
+          languageProperty: "expr",
           languageNode: node,
         }));
       },
@@ -377,5 +436,10 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     }
 
     return processNames;
+  }
+
+  // TODO: MAYBE ENUM CAN BE DEFINED WITHOT THE FILENAME IN THE FIRST PLACE
+  protected getTypeName(type: AnnotatedTypeAfterValidation): string | undefined {
+    return type.name.split("::").pop();
   }
 }
