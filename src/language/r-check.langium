@@ -131,9 +131,9 @@ Ltol: (quants+=LtolQuant)* expr=CompoundExpr;
 LtolQuant: op=('forall'|'exists') name=ID ':' (anyKind='Agent' | kinds+=[Agent] ('|' kinds+=[Agent])*) '.';
 
 LtolMod infers Ltol:
-    {infer Finally} 'F' expr=CompoundExpr
-    | {infer Globally} 'G' expr=CompoundExpr
-    | {infer Next} 'X' expr=CompoundExpr
+    {infer Finally} operator='F' expr=CompoundExpr
+    | {infer Globally} operator='G' expr=CompoundExpr
+    | {infer Next} operator='X' expr=CompoundExpr
     ;
 
 LtolBase infers Ltol:
@@ -149,8 +149,8 @@ BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
 LiteralObs: value=('true'|'false'); 
 ChannelObs: 'chan' ('=='|'='|'!=') (chan=ID | chan='*');
 SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
-ForallObs: 'forall' '(' (pred=CompoundExpr) ')';
-ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';
+ForallObs: operator='forall' '(' (expr=CompoundExpr) ')';
+ExistsObs: operator='exists' '(' (expr=CompoundExpr) ')';
 
 
 hidden terminal WS: /\s+/;
