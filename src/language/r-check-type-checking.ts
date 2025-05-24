@@ -71,6 +71,8 @@ import {
   InferOperatorWithSingleOperand,
   InferenceRuleNotApplicable,
   NO_PARAMETER_NAME,
+  Type,
+  isClassType,
 } from "typir";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
@@ -324,16 +326,47 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           // Case already handled in class declaration
           return InferenceRuleNotApplicable;
         } else if (isLtolQuant(instance)) {
-          if (instance.kinds.some((k) => k.ref?.name === undefined)) {
+          if (instance.kinds.some((k) => k.ref === undefined)) {
             throw new Error("Not a valid agent instance.");
           }
-          //const agents = instance.kinds.map((k) => typir.factory.Classes.get(k.ref?.name!));
-          // TODO: Add inference rule for LtolQuant
-          // get fields of all the classes, do set intersection, infer type if still in set
-          // else issue warning?
-          //const fields = agents[0].getType()?.getFields(false);
-          // TODO: return correct type
-          return InferenceRuleNotApplicable;
+
+          const agentFields = instance.kinds.map((k) => {
+            const agentType = typir.Inference.inferType(k.ref!);
+
+            if (agentType instanceof Type) {
+              if (isClassType(agentType)) {
+                return agentType.getFields(false);
+              } else {
+                throw new Error("Encountered unexpected non-class type.");
+              }
+            } else if (agentType instanceof Array) {
+              throw new Error("Unexpected inference problem.");
+            } else {
+              assertUnreachable(agentType);
+            }
+          });
+
+          const intersection = this.intersectMaps(agentFields);
+          const variableType = intersection.get(languageNode.variable.$refText);
+
+          if (variableType === undefined) {
+            // Field does not exist on agent intersection
+            typir.validation.Collector.addValidationRule((node, accept) => {
+              if (node === languageNode) {
+                accept({
+                  languageNode: node,
+                  languageProperty: "variable",
+                  severity: "error",
+                  message: `Property '${languageNode.variable.$refText}' does not exist on type '${instance.kinds
+                    .map((k) => k.ref?.name)
+                    .join(" | ")}'.`,
+                });
+              }
+            });
+            return typeAny;
+          } else {
+            return variableType;
+          }
         } else if (instance === undefined) {
           return InferenceRuleNotApplicable;
         } else {
@@ -477,5 +510,37 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
   protected getTypeName(type: AnnotatedTypeAfterValidation): string | undefined {
     return type.name.split("::").pop();
+  }
+
+  protected intersectMaps<K, V>(maps: Map<K, V>[]): Map<K, V> {
+    if (maps.length === 0) {
+      return new Map<K, V>();
+    }
+    if (maps.length === 1) {
+      return new Map(maps[0]);
+    }
+
+    const resultMap = new Map<K, V>();
+    const firstMap = maps[0];
+
+    // Iterate over the entries of the first map
+    for (const [key, value] of firstMap.entries()) {
+      let isInAllMaps = true;
+
+      // Check if this key exists in all other maps with the same value
+      for (let i = 1; i < maps.length; i++) {
+        const currentMap = maps[i];
+        if (!currentMap.has(key) || currentMap.get(key) !== value) {
+          isInAllMaps = false;
+          break;
+        }
+      }
+      // If the key and value matched across all maps, add it to the result
+      if (isInAllMaps) {
+        resultMap.set(key, value);
+      }
+    }
+
+    return resultMap;
   }
 }
