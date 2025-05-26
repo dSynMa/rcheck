@@ -35,7 +35,7 @@ Agent:
     'repeat' ':' repeat=Choice
     ;
 
-Relabel: var=[PropVar] '<-' CompoundExpr;
+Relabel: var=[PropVar] '<-' expr=CompoundExpr;
 
 Choice: 
     left=Sequence ({infer Choice.left=current} '+' right=Sequence)*;
@@ -91,30 +91,32 @@ Param: TypedDeclaration;
 MsgStruct: TypedDeclaration;
 PropVar: TypedDeclaration;
 
-
 CompoundExpr:
-    left=Comparison ({infer CompoundExpr.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
+    AddSub;
 
-Comparison:
-    left=AddSub ({infer Comparison.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
+Logical infers CompoundExpr:
+    Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
 
-AddSub:
+Comparison infers CompoundExpr:
+    BaseExpr ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=BaseExpr)?;
+
+AddSub infers CompoundExpr:
     MulDiv ({infer BinExpr.left=current} operator=('+' | '-') right=MulDiv)*;
 
-MulDiv:
-    BaseExpr ({infer BinExpr.left=current} operator=('*' | '/') right=BaseExpr)*;
+MulDiv infers CompoundExpr:
+    Logical ({infer BinExpr.left=current} operator=('*' | '/') right=Logical)*;
 
 Qualifier : Instance | LtolQuant;
 
-BaseExpr:
-    '(' CompoundExpr ')'
+BaseExpr infers CompoundExpr:
+    '(' AddSub ')'
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
     | {infer QualifiedRef} instance=[Qualifier] '-' variable=[Target]
     | {infer Ref} variable=[Target]
     | {infer PropVarRef} variable=[PropVar:PV]
-    | {infer UMinus} '-' expr=BaseExpr
-    | {infer Neg} '!' expr=BaseExpr
-    | {infer Ref} currentChannel='chan'
+    | {infer UMinus} operator='-' expr=BaseExpr
+    | {infer Neg} operator='!' expr=BaseExpr
+    | {infer ChannelRef} currentChannel='chan'
     | {infer Myself} myself='myself'
     | {infer Broadcast} value="*"
     | {infer NumberLiteral} value=INT
@@ -124,16 +126,14 @@ BaseExpr:
     | {infer LtolBase} LtolBase
     ;
 
-type Expr = BaseExpr | BinExpr | CompoundExpr | Comparison ;
-
 Ltol: (quants+=LtolQuant)* expr=CompoundExpr;
 
 LtolQuant: op=('forall'|'exists') name=ID ':' (anyKind='Agent' | kinds+=[Agent] ('|' kinds+=[Agent])*) '.';
 
 LtolMod infers Ltol:
-    {infer Finally} 'F' expr=CompoundExpr
-    | {infer Globally} 'G' expr=CompoundExpr
-    | {infer Next} 'X' expr=CompoundExpr
+    {infer Finally} operator='F' expr=CompoundExpr
+    | {infer Globally} operator='G' expr=CompoundExpr
+    | {infer Next} operator='X' expr=CompoundExpr
     ;
 
 LtolBase infers Ltol:
@@ -149,8 +149,8 @@ BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
 LiteralObs: value=('true'|'false'); 
 ChannelObs: 'chan' ('=='|'='|'!=') (chan=ID | chan='*');
 SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
-ForallObs: 'forall' '(' (pred=CompoundExpr) ')';
-ExistsObs: 'exists' '(' (pred=CompoundExpr) ')';
+ForallObs: operator='forall' '(' (expr=CompoundExpr) ')';
+ExistsObs: operator='exists' '(' (expr=CompoundExpr) ')';
 
 
 hidden terminal WS: /\s+/;
