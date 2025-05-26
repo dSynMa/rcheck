@@ -2,20 +2,22 @@ import { execFile } from "child_process";
 import * as path from 'node:path';
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
-import { execPromise, ExecResult, getCurrentRcpFile, runJar } from "./common.js";
+import { ExecResult, getCurrentRcpFile, readPromise, runJar } from "./common.js";
 
 let temp: Temp
 let hasgv: boolean
-const graphvizInteractiveExtensionId = "tintinweb.graphviz-interactive-preview";
-const graphvizInteractiveCmdName = "graphviz-interactive-preview.preview.beside";
+let channel: vscode.OutputChannel
+const graphvizInteractiveExtensionId = "efanzh.graphviz-preview";
+const graphvizInteractiveCmdName = "graphviz.showPreviewToSide";
 
 /**
  * Implements the `rcheck.todot` command
  * (Generate/show DOT transition systems for all agents)
  */
 export class ToDot {
-    constructor(t: Temp) {
+    constructor(t: Temp, ch: vscode.OutputChannel) {
         temp = t;
+        channel = ch;
         hasgv = vscode.extensions.all.some((x) => x.id.includes(graphvizInteractiveExtensionId));
     }
 
@@ -26,9 +28,9 @@ export class ToDot {
     Init(context: vscode.ExtensionContext): void {
         context.subscriptions.push(
             vscode.commands.registerCommand('rcheck.todot', async () => {
-                const path = getCurrentRcpFile()!.toString();
-                check()
-                .then(() => runJar(["-i", path, "--dot", "-tmp"]))
+                const rcpPath = getCurrentRcpFile()!;
+                temp.toJson(rcpPath)
+                .then((tmpJson) => runJar(["-j", tmpJson, "--dot", "-tmp"]))
                 .then(dotCallback)
                 .catch(vscode.window.showErrorMessage)
             })
@@ -36,17 +38,8 @@ export class ToDot {
     }
 }
 
-async function check() {
-    if (hasgv) {
-        return Promise.resolve();
-    }
-    return execPromise("dot", ["--version"]).then(
-        (_) => Promise.resolve(),
-        (__) => Promise.reject("This command requires either the GraphViz Interactive Preview extension or the Graphviz package."))
-}
 
 function dotCallback(value: ExecResult) {
-    
     // Get names of .dot files
     const dotfiles = value.stderr.split('\n').map((f) => f.trim()).filter((f) => f != '');
 
@@ -61,10 +54,19 @@ function dotCallback(value: ExecResult) {
         else {
             // Turn the .dot file into pdf
             execFile("dot", ["-O", "-Tpdf", f], (err, _, __) => {
-                // Open the pdfs in side views
-                const pdfUri = vscode.Uri.file(`${f}.pdf`)
-                vscode.commands.executeCommand('vscode.open', pdfUri, vscode.ViewColumn.Beside);
-                temp.addFile(pdfUri.fsPath);
+                if (err){
+                    readPromise(f).then((contents) => {
+                        channel.appendLine(`[ERROR] Error rendering ${f}:`);
+                        channel.appendLine(`[ERROR] ${err.message}`);
+                        channel.appendLine(`[ERROR] Contents of ${f}:`);
+                        channel.appendLine(`[ERROR] ${contents}`);
+                    });
+                } else {
+                    // Open the pdfs in side views
+                    const pdfUri = vscode.Uri.file(`${f}.pdf`)
+                    vscode.commands.executeCommand('vscode.open', pdfUri, vscode.ViewColumn.Beside);
+                    temp.addFile(pdfUri.fsPath);
+                }
             });
         }
     });
