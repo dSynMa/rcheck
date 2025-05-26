@@ -1,8 +1,9 @@
 import { ChildProcess } from "child_process";
-import { mkdtempSync, rmdir, unlink } from "fs";
+import { mkdtempSync, rmdir, unlink, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { Disposable } from "vscode";
+import { parseToJson } from "../language/util.js";
 
 /**
  * Simple tracker of temporary files/directories/processes, which
@@ -104,5 +105,12 @@ export class Temp implements Disposable {
 
         this.children.forEach((_: ChildProcess[], name: string) => this.cancel(name));
 
+    }
+
+    async toJson(rcpPath: string) {
+        const parsed = await parseToJson(rcpPath);
+        const tmpJson = this.makeFile(path.basename(rcpPath, ".rcp"), ".json");
+        writeFileSync(tmpJson, parsed);
+        return tmpJson;
     }
 }

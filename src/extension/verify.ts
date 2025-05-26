@@ -1,11 +1,9 @@
 import { execFile } from "child_process";
-import * as path from 'node:path';
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
 import { execPromise, ExecResult, getCurrentRcpFile, readPromise, runJar, writePromise } from "./common.js";
-import { parseToJson } from "../language/util.js";
 import { formatStep, formatTransition, renderStep, Step } from "./cex.js";
 
 let temp: Temp
@@ -25,7 +23,7 @@ export class Verify {
         context.subscriptions.push(
             vscode.commands.registerCommand('rcheck.verify', async () => {
                 const rcpPath = getCurrentRcpFile()!;
-                const tmpJson = await toJson(rcpPath);
+                const tmpJson = await temp.toJson(rcpPath);
                 check()
                 .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(findSpecs)
@@ -34,7 +32,7 @@ export class Verify {
             }),
             vscode.commands.registerCommand('rcheck.tosmv', async () => {
                 const rcpPath = getCurrentRcpFile()!;
-                toJson(rcpPath)
+                temp.toJson(rcpPath)
                 .then((tmpJson) => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(value => {
                     const smvFile = value.stderr.trim();
@@ -42,17 +40,11 @@ export class Verify {
                     return smvFile;
                 })
                 .then(readPromise)
-                .then(showSmv);
+                .then(showSmv)
+                .catch(vscode.window.showErrorMessage);
             })
         );
     }
-}
-
-async function toJson(rcpPath: string) {
-    const parsed = await parseToJson(rcpPath);
-    const tmpJson = temp.makeFile(path.basename(rcpPath, ".rcp"), ".json");
-    writeFileSync(tmpJson, parsed);
-    return tmpJson;
 }
 
 async function showSmv(content: string) {
