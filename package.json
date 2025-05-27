@@ -87,30 +87,38 @@
     "contributes": {
         "commands": [
             {
+                "command": "rcheck.simulate",
+                "title": "R-CHECK: Simulate system"
+            },
+            {
                 "command": "rcheck.todot",
                 "title": "R-CHECK: Show agents as automata"
             },
             {
-                "command": "rcheck.verify",
-                "title": "R-CHECK: Model-check using IC3"
-            },
-            {
                 "command": "rcheck.tosmv",
                 "title": "R-CHECK: Show SMV translation"
+            },
+            {
+                "command": "rcheck.verify",
+                "title": "R-CHECK: Model-check using IC3"
             }
         ],
         "menus": {
             "commandPalette": [
                 {
+                    "command": "rcheck.simulate",
+                    "when": "resourceExtname == .rcp"
+                },
+                {
                     "command": "rcheck.todot",
                     "when": "resourceExtname == .rcp"
                 },
                 {
-                    "command": "rcheck.verify",
+                    "command": "rcheck.tosmv",
                     "when": "resourceExtname == .rcp"
                 },
                 {
-                    "command": "rcheck.tosmv",
+                    "command": "rcheck.verify",
                     "when": "resourceExtname == .rcp"
                 }
             ]
