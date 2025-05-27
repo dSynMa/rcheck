@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { execFile } from "child_process";
 import { promisify } from "node:util";
 import { PathOrFileDescriptor, readFile, writeFile } from "node:fs";
+import { spawn } from "node:child_process";
 
 let jarPath: string;
 let context: vscode.ExtensionContext;
@@ -37,4 +38,9 @@ export function getCurrentRcpFile() {
 export async function runJar(args: string[]) {
     const args_ = ["-jar", jarPath].concat(args);
     return execPromise("java", args_);
+}
+
+export function spawnJar(args: string[]) {
+    const args_ = ["-jar", jarPath].concat(args);
+    return spawn("java", args_);
 }
