@@ -89,7 +89,7 @@
         "commands": [
             {
                 "command": "rcheck.todot",
-                "title": "R-CHECK: Show agents' transition systems"
+                "title": "R-CHECK: Show agents as automata"
             },
             {
                 "command": "rcheck.verify",

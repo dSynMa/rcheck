@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
     temp = new Temp();
     context.subscriptions.push(temp);
     Init(context);
-    todot = new ToDot(temp);
+    todot = new ToDot(temp, client.outputChannel);
     verify = new Verify(temp, client.outputChannel);
     todot.Init(context);
     verify.Init(context);

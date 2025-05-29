@@ -69,8 +69,7 @@ Assign: left=[Target] ':=' right=CompoundExpr;
 
 ChannelExprRef: Case | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
-LocationExprRef: Instance | Local;
-LocationExpr: (location=[LocationExprRef]);
+LocationExprRef: Local;
 SupplyLocationExpr: (location=[LocationExprRef] | myself="myself" | any="any");
 GetLocationExpr: predicate=CompoundExpr;
 
