@@ -7,6 +7,7 @@ import {
   BinExpr,
   BinObs,
   Box,
+  CompoundExpr,
   Diamond,
   Enum,
   ExistsObs,
@@ -43,7 +44,9 @@ import {
   isNumberLiteral,
   isParam,
   isPropVar,
+  isRange,
   isReceive,
+  isRef,
   isRelabel,
   isRep,
   isSend,
@@ -55,6 +58,7 @@ import {
   MsgStruct,
   Neg,
   Next,
+  NumberLiteral,
   Param,
   PropVar,
   QualifiedRef,
@@ -72,8 +76,12 @@ import {
   InferenceRuleNotApplicable,
   NO_PARAMETER_NAME,
   Type,
+  TypirServices,
   isClassType,
 } from "typir";
+
+// TODO: replace by class with class methods (a.contains(b), a.intersects(b))?
+type RangeBounds = { lower: number; upper: number };
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
   onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
@@ -90,13 +98,29 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .finish();
 
     const typeInt = typir.factory.Primitives.create({ primitiveName: "int" })
-      .inferenceRule({ filter: isNumberLiteral })
+      .inferenceRule({
+        languageKey: NumberLiteral,
+        matching: (node: NumberLiteral) => node.value < 0,
+      })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
-        matching: (node: Local | Param | MsgStruct | PropVar) =>
-          node.builtinType === "int" || node.rangeType !== undefined,
+        matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "int",
       })
       .finish();
+
+    const typeRange = typir.factory.Primitives.create({ primitiveName: "range" })
+      .inferenceRule({
+        languageKey: NumberLiteral,
+        matching: (node: NumberLiteral) => node.value >= 0,
+      })
+      .inferenceRule({ filter: isRange })
+      .inferenceRule({
+        languageKey: [Local, Param, MsgStruct, PropVar],
+        matching: (node: Local | Param | MsgStruct | PropVar) => node.rangeType !== undefined,
+      })
+      .finish();
+
+    typir.Conversion.markAsConvertible(typeRange, typeInt, "IMPLICIT_EXPLICIT");
 
     typir.factory.Primitives.create({ primitiveName: "location" })
       .inferenceRule({
@@ -138,15 +162,25 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     for (const operator of ["+", "-", "*", "/"]) {
       typir.factory.Operators.createBinary({
         name: operator,
-        signature: { left: typeInt, right: typeInt, return: typeInt },
+        signatures: [
+          { left: typeInt, right: typeInt, return: typeInt },
+          { left: typeRange, right: typeRange, return: typeRange },
+          { left: typeInt, right: typeRange, return: typeRange },
+          { left: typeRange, right: typeInt, return: typeRange },
+        ],
       })
-        .inferenceRule(binaryInferenceRule)
+        .inferenceRule({ ...binaryInferenceRule })
         .finish();
     }
     for (const operator of ["<", "<=", ">", ">="]) {
       typir.factory.Operators.createBinary({
         name: operator,
-        signature: { left: typeInt, right: typeInt, return: typeBool },
+        signatures: [
+          { left: typeInt, right: typeInt, return: typeBool },
+          { left: typeRange, right: typeRange, return: typeBool },
+          { left: typeInt, right: typeRange, return: typeBool },
+          { left: typeRange, right: typeInt, return: typeBool },
+        ],
       })
         .inferenceRule(binaryInferenceRule)
         .finish();
@@ -168,17 +202,45 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       })
         .inferenceRule({
           ...binaryInferenceRule,
-          validation: (node, _operatorName, _operatorType, accept, typir) =>
-            typir.validation.Constraints.ensureNodeIsEquals(node.left, node.right, accept, (actual, expected) => ({
-              message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
-                node.left.$cstNode?.text
-              }' and '${node.right.$cstNode?.text}' have the different types '${this.getTypeName(
-                actual
-              )}' and '${this.getTypeName(expected)}'.`,
-              languageNode: node, // Inside the BinaryExpression ...
-              languageProperty: "operator", // ... mark the '==' or '!=' token, i.e. the 'operator' property
-              severity: "warning", // Only issue warning because mismatch returns "false"
-            })),
+          validation: (node, _operatorName, _operatorType, accept, typir) => {
+            const leftType = typir.Inference.inferType(node.left);
+            const rightType = typir.Inference.inferType(node.right);
+            if (leftType === typeInt && rightType === typeRange) {
+              // no problem here
+            } else if (leftType === typeRange && rightType === typeInt) {
+              // no problem either
+            } else if (leftType === typeRange && rightType === typeRange) {
+              const leftRange = this.getRangeBounds(node.left, typir);
+              const rightRange = this.getRangeBounds(node.right, typir);
+              const rangesIntersect = this.rangesIntersect(leftRange, rightRange);
+              // TODO: take care of negative values
+              if (!rangesIntersect) {
+                accept({
+                  message: `This comparison will always return '${
+                    node.operator === "!=" ? "true" : "false"
+                  }' as the ranges '${leftRange.lower}${
+                    leftRange.upper === leftRange.lower ? "" : `..${leftRange.upper}`
+                  }' and '${rightRange.lower}${
+                    rightRange.upper === rightRange.lower ? "" : `..${rightRange.upper}`
+                  }' have no overlap.`,
+                  languageNode: node,
+                  languageProperty: "operator",
+                  severity: "warning",
+                });
+              }
+            } else {
+              typir.validation.Constraints.ensureNodeIsEquals(node.left, node.right, accept, (actual, expected) => ({
+                message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
+                  node.left.$cstNode?.text
+                }' and '${node.right.$cstNode?.text}' have the different types '${this.getTypeName(
+                  actual
+                )}' and '${this.getTypeName(expected)}'.`,
+                languageNode: node,
+                languageProperty: "operator",
+                severity: "warning",
+              }));
+            }
+          },
         })
         .finish();
     }
@@ -273,7 +335,13 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     };
 
     // Unary operators
-    typir.factory.Operators.createUnary({ name: "-", signature: { operand: typeInt, return: typeInt } })
+    typir.factory.Operators.createUnary({
+      name: "-",
+      signatures: [
+        { operand: typeInt, return: typeInt },
+        { operand: typeRange, return: typeInt },
+      ],
+    })
       .inferenceRule(unaryInferenceRule)
       .finish();
     for (const operator of ["!", "F", "G", "X", "forall", "exists"]) {
@@ -378,14 +446,14 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     // TODO: maybe this validation rule can be implemented upon class creation
     typir.validation.Collector.addValidationRulesForAstNodes({
       Instance: (node, accept, typir) => {
-        typir.validation.Constraints.ensureNodeIsAssignable(node.init, typeBool, accept, () => ({
+        typir.validation.Constraints.ensureNodeIsEquals(node.init, typeBool, accept, () => ({
           message: "Agent inititalization needs to evaluate to 'bool'.",
           languageProperty: "init",
           languageNode: node,
         }));
       },
       Ltol: (node, accept, typir) => {
-        typir.validation.Constraints.ensureNodeIsAssignable(node.expr, typeBool, accept, () => ({
+        typir.validation.Constraints.ensureNodeIsEquals(node.expr, typeBool, accept, () => ({
           message: "SPEC needs to evaluate to 'bool'.",
           languageProperty: "expr",
           languageNode: node,
@@ -394,7 +462,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       ChannelObs: (node, accept, typir) => {
         // Do not need to check broadcast symbol
         if (node.bcast !== undefined) return;
-        typir.validation.Constraints.ensureNodeIsAssignable(node.chan?.ref?.$container, typeChannel, accept, () => ({
+        typir.validation.Constraints.ensureNodeIsEquals(node.chan?.ref?.$container, typeChannel, accept, () => ({
           message: "Channel reference needs to evaluate to 'channel'.",
           languageProperty: "chan",
           languageNode: node,
@@ -461,6 +529,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         .inferenceRuleForClassDeclaration({
           languageKey: Agent,
           matching: (node: Agent) => languageNode === node,
+          validation: (node, type, accept, typir) => {
+            // TODO: add validation for agents here?
+          },
         })
         .inferenceRuleForFieldAccess({
           languageKey: QualifiedRef,
@@ -542,5 +613,47 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     }
 
     return resultMap;
+  }
+
+  // TODO: make this iterative?
+  protected getRangeBounds(expr: CompoundExpr, typir: TypirServices<AstNode>): RangeBounds {
+    if (typir.Inference.inferType(expr) !== typir.factory.Primitives.get({ primitiveName: "range" })) {
+      throw new Error("Cannot get range bounds of non-range type.");
+    }
+    if (isRef(expr)) {
+      const target = expr.variable.ref!;
+      if (isLocal(target) || isParam(target) || isMsgStruct(target) || isPropVar(target)) {
+        const range = target.rangeType!;
+        return { lower: range.lower, upper: range.upper };
+      } else {
+        throw new Error("Unexpected target found.");
+      }
+    } else if (isNumberLiteral(expr)) {
+      return { lower: expr.value, upper: expr.value };
+    } else if (isBinExpr(expr)) {
+      const leftRange = this.getRangeBounds(expr.left, typir);
+      const rightRange = this.getRangeBounds(expr.right, typir);
+      switch (expr.operator) {
+        case "+":
+          return { lower: leftRange.lower + rightRange.lower, upper: leftRange.upper + rightRange.upper };
+        case "-":
+          return { lower: leftRange.lower - rightRange.upper, upper: leftRange.upper - rightRange.lower };
+        case "*":
+          return { lower: leftRange.lower * rightRange.lower, upper: leftRange.upper * rightRange.upper };
+        case "/":
+          return {
+            lower: Math.floor(leftRange.lower / rightRange.upper),
+            upper: Math.floor(leftRange.upper / rightRange.lower),
+          };
+        default:
+          throw new Error("Unexpected operator found.");
+      }
+    } else {
+      throw new Error("Unexpected expression found.");
+    }
+  }
+
+  protected rangesIntersect(a: RangeBounds, b: RangeBounds): boolean {
+    return a.lower <= b.upper && b.lower <= a.upper;
   }
 }
