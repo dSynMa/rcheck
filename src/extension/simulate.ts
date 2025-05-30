@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
-import { getCurrentRcpFile, spawnJar } from "./common.js";
+import { getCurrentRcpFile, renderTemplate, spawnJar } from "./common.js";
 import { ChildProcess } from "node:child_process";
 import axios from "axios";
 
@@ -29,28 +29,6 @@ export class Simulate {
             }));
         ctx = context;
     }
-}
-
-
-function getHtml(fname: string) {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulator: ${fname}</title>
-</head>
-<body>
-    <h1>R-CHECK simulator: ${fname}</h1>
-    <button onclick="back()">Back</button>
-    <button onclick="next()">Next</button>
-    <script>
-        const vscode = acquireVsCodeApi();
-        function next() { vscode.postMessage({ command: 'next' }); }
-        function back() { vscode.postMessage({ command: 'back' }); }
-    </script>
-</body>
-</html>`
 }
 
 export class SimulationPanel {
@@ -105,12 +83,12 @@ export class SimulationPanel {
     async reset() {
         this.initialized = false;
         if (this.panel !== undefined) {
-            const html = getHtml(this.rcp);
-            this.panel.webview.html = html;
+            this.panel.webview.html = await renderTemplate(ctx, "simulate.html", {fname: this.rcp}, this.panel.webview);
             this.panel.onDidDispose(() => this.killServer());
             this.panel.webview.onDidReceiveMessage((msg) => this.handleMessage(msg), undefined, ctx.subscriptions);
         }
     }
+
 
     handleMessage(msg: any) {
         switch (msg.command) {
@@ -124,18 +102,21 @@ export class SimulationPanel {
         channel.appendLine("back");
         const url = `${this.serverUrl()}/interpretBack`
         channel.appendLine(`[DEBUG] ${url}`);
-        const x = await axios.get(url);
-        channel.appendLine(`[DEBUG] ${x.status.toString()}`);
-        channel.appendLine(`[DEBUG] ${JSON.stringify(x.data.state)}`);
+        const response = await axios.get(url);
+        channel.appendLine(`[DEBUG] ${response.status}`);
+        channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
     }
 
     async next() {
         channel.appendLine("next");
         const url = `${this.serverUrl()}/interpretNext?reset=${!this.initialized}`
         channel.appendLine(`[DEBUG] ${url}`);
-        const x = await axios.get(url);
-        channel.appendLine(`[DEBUG] ${x.status.toString()}`);
-        channel.appendLine(`[DEBUG] ${JSON.stringify(x.data.state)}`);
+        const response = await axios.get(url);
+        channel.appendLine(`[DEBUG] ${response.status}`);
+        channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
+        channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.transitions)}`);
+        this.panel?.webview.postMessage({ command: 'update-transitions', content: response.data.transitions });
+
         this.initialized = true;
     }
     
@@ -146,5 +127,6 @@ export class SimulationPanel {
         } else {
             channel.appendLine(`[ERROR] Error terminating simulation server (PID ${pid})`);
         }
+        this.port = 0;
     }
 }

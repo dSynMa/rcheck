@@ -14,7 +14,7 @@ export const writePromise = promisify(writeFile);
 
 const rp = promisify(readFile);
 export async function readPromise(x: PathOrFileDescriptor): Promise<string> {
-    return rp(x, {encoding: "utf-8"});
+    return rp(x, { encoding: "utf-8" });
 }
 export type ExecResult = {
     stdout: string,
