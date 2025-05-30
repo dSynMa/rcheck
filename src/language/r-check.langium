@@ -146,8 +146,8 @@ CompoundObs infers Obs:
 
 BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
 LiteralObs: value=('true'|'false'); 
-ChannelObs: 'chan' ('=='|'='|'!=') (chan=ID | chan='*');
-SenderObs: 'sender' ('=='|'='|'!=') sender=ID;
+ChannelObs: 'chan' ('=='|'='|'!=') (chan=[Case] | bcast='*');
+SenderObs: 'sender' ('=='|'='|'!=') sender=[Instance];
 ForallObs: operator='forall' '(' (expr=CompoundExpr) ')';
 ExistsObs: operator='exists' '(' (expr=CompoundExpr) ')';
 
