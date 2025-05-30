@@ -44,6 +44,7 @@ import {
   isNumberLiteral,
   isParam,
   isPropVar,
+  isPropVarRef,
   isRange,
   isReceive,
   isRef,
@@ -58,11 +59,12 @@ import {
   MsgStruct,
   Neg,
   Next,
-  NumberLiteral,
   Param,
   PropVar,
+  PropVarRef,
   QualifiedRef,
   RCheckAstType,
+  Ref,
   Relabel,
   Sequence,
   SupplyLocationExpr,
@@ -76,12 +78,8 @@ import {
   InferenceRuleNotApplicable,
   NO_PARAMETER_NAME,
   Type,
-  TypirServices,
   isClassType,
 } from "typir";
-
-// TODO: replace by class with class methods (a.contains(b), a.intersects(b))?
-type RangeBounds = { lower: number; upper: number };
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
   onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
@@ -98,10 +96,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .finish();
 
     const typeInt = typir.factory.Primitives.create({ primitiveName: "int" })
-      .inferenceRule({
-        languageKey: NumberLiteral,
-        matching: (node: NumberLiteral) => node.value < 0,
-      })
+      .inferenceRule({ filter: isNumberLiteral })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "int",
@@ -109,10 +104,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .finish();
 
     const typeRange = typir.factory.Primitives.create({ primitiveName: "range" })
-      .inferenceRule({
-        languageKey: NumberLiteral,
-        matching: (node: NumberLiteral) => node.value >= 0,
-      })
       .inferenceRule({ filter: isRange })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
@@ -205,24 +196,28 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           validation: (node, _operatorName, _operatorType, accept, typir) => {
             const leftType = typir.Inference.inferType(node.left);
             const rightType = typir.Inference.inferType(node.right);
-            if (leftType === typeInt && rightType === typeRange) {
-              // no problem here
-            } else if (leftType === typeRange && rightType === typeInt) {
-              // no problem either
-            } else if (leftType === typeRange && rightType === typeRange) {
-              const leftRange = this.getRangeBounds(node.left, typir);
-              const rightRange = this.getRangeBounds(node.right, typir);
-              const rangesIntersect = this.rangesIntersect(leftRange, rightRange);
-              // TODO: take care of negative values
-              if (!rangesIntersect) {
+            if (leftType === typeRange || rightType === typeRange) {
+              let leftRange;
+              let rightRange;
+              try {
+                leftRange = IntRange.fromRangeExpr(node.left);
+                rightRange = IntRange.fromRangeExpr(node.right);
+              } catch (ex) {
+                const error = ex as Error;
+                return accept({
+                  message: `Cannot compare 'range' to '${
+                    leftRange === undefined ? node.left.$cstNode?.text : node.right.$cstNode?.text
+                  }': ${error.message}`,
+                  languageNode: node,
+                  languageProperty: leftRange === undefined ? "left" : "right",
+                  severity: "error",
+                });
+              }
+              if (!leftRange.intersects(rightRange)) {
                 accept({
                   message: `This comparison will always return '${
                     node.operator === "!=" ? "true" : "false"
-                  }' as the ranges '${leftRange.lower}${
-                    leftRange.upper === leftRange.lower ? "" : `..${leftRange.upper}`
-                  }' and '${rightRange.lower}${
-                    rightRange.upper === rightRange.lower ? "" : `..${rightRange.upper}`
-                  }' have no overlap.`,
+                  }' as the ranges '${leftRange}' and '${rightRange}' have no overlap.`,
                   languageNode: node,
                   languageProperty: "operator",
                   severity: "warning",
@@ -339,7 +334,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       name: "-",
       signatures: [
         { operand: typeInt, return: typeInt },
-        { operand: typeRange, return: typeInt },
+        { operand: typeRange, return: typeRange },
       ],
     })
       .inferenceRule(unaryInferenceRule)
@@ -614,46 +609,98 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
     return resultMap;
   }
+}
+
+class IntRange {
+  private lower: number;
+  private upper: number;
+
+  constructor(lower: number, upper: number) {
+    this.lower = lower;
+    this.upper = upper;
+  }
 
   // TODO: make this iterative?
-  protected getRangeBounds(expr: CompoundExpr, typir: TypirServices<AstNode>): RangeBounds {
-    if (typir.Inference.inferType(expr) !== typir.factory.Primitives.get({ primitiveName: "range" })) {
-      throw new Error("Cannot get range bounds of non-range type.");
-    }
-    if (isRef(expr)) {
-      const target = expr.variable.ref!;
+  public static fromRangeExpr(expr: CompoundExpr): IntRange {
+    const getRangeBoundsOfRef = (ref: Ref | PropVarRef) => {
+      const target = ref.variable.ref;
       if (isLocal(target) || isParam(target) || isMsgStruct(target) || isPropVar(target)) {
-        const range = target.rangeType!;
-        return { lower: range.lower, upper: range.upper };
+        if (target.rangeType !== undefined) {
+          return new this(target.rangeType.lower, target.rangeType.upper);
+        } else {
+          return new this(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+          throw new Error(`Cannot infer range bounds of variable '${expr.$cstNode?.text}' with type 'int'.`);
+        }
       } else {
         throw new Error("Unexpected target found.");
       }
+    };
+
+    if (isRef(expr)) {
+      return getRangeBoundsOfRef(expr);
+    } else if (isPropVarRef(expr)) {
+      return getRangeBoundsOfRef(expr);
     } else if (isNumberLiteral(expr)) {
-      return { lower: expr.value, upper: expr.value };
+      return new this(expr.value, expr.value);
     } else if (isBinExpr(expr)) {
-      const leftRange = this.getRangeBounds(expr.left, typir);
-      const rightRange = this.getRangeBounds(expr.right, typir);
+      const leftRange = IntRange.fromRangeExpr(expr.left);
+      const rightRange = IntRange.fromRangeExpr(expr.right);
       switch (expr.operator) {
         case "+":
-          return { lower: leftRange.lower + rightRange.lower, upper: leftRange.upper + rightRange.upper };
+          return leftRange.plus(rightRange);
         case "-":
-          return { lower: leftRange.lower - rightRange.upper, upper: leftRange.upper - rightRange.lower };
+          return leftRange.minus(rightRange);
         case "*":
-          return { lower: leftRange.lower * rightRange.lower, upper: leftRange.upper * rightRange.upper };
+          return leftRange.times(rightRange);
         case "/":
-          return {
-            lower: Math.floor(leftRange.lower / rightRange.upper),
-            upper: Math.floor(leftRange.upper / rightRange.lower),
-          };
+          return leftRange.devidedBy(rightRange);
         default:
           throw new Error("Unexpected operator found.");
       }
+    } else if (isUMinus(expr)) {
+      return new this(0, 0).minus(IntRange.fromRangeExpr(expr.expr));
     } else {
       throw new Error("Unexpected expression found.");
     }
   }
 
-  protected rangesIntersect(a: RangeBounds, b: RangeBounds): boolean {
-    return a.lower <= b.upper && b.lower <= a.upper;
+  public plus(other: IntRange): IntRange {
+    return new IntRange(this.lower + other.lower, this.upper + other.upper);
+  }
+
+  public minus(other: IntRange): IntRange {
+    return new IntRange(this.lower - other.upper, this.upper - other.lower);
+  }
+
+  public times(other: IntRange): IntRange {
+    const p1 = this.lower * other.lower;
+    const p2 = this.lower * other.upper;
+    const p3 = this.upper * other.lower;
+    const p4 = this.upper * other.upper;
+    return new IntRange(Math.min(p1, p2, p3, p4), Math.max(p1, p2, p3, p4));
+  }
+
+  public devidedBy(other: IntRange): IntRange {
+    if (other.lower === 0 || other.upper === 0) {
+      throw new Error("Division by a range that includes zero is not supported.");
+    }
+    const d1 = Math.trunc(this.lower / other.lower);
+    const d2 = Math.trunc(this.lower / other.upper);
+    const d3 = Math.trunc(this.upper / other.lower);
+    const d4 = Math.trunc(this.upper / other.upper);
+
+    return new IntRange(Math.min(d1, d2, d3, d4), Math.max(d1, d2, d3, d4));
+  }
+
+  public intersects(other: IntRange): boolean {
+    return this.lower <= other.upper && other.lower <= this.upper;
+  }
+
+  public contains(other: IntRange): boolean {
+    return this.lower <= other.lower && this.upper >= other.upper;
+  }
+
+  public toString(): string {
+    return this.lower === this.upper ? `${this.lower}` : `${this.lower}..${this.upper}`;
   }
 }
