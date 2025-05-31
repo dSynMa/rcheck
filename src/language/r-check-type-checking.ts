@@ -45,6 +45,7 @@ import {
   isParam,
   isPropVar,
   isPropVarRef,
+  isQualifiedRef,
   isRange,
   isReceive,
   isRef,
@@ -54,6 +55,7 @@ import {
   isSenderObs,
   isSequence,
   isSupply,
+  isTarget,
   isUMinus,
   Local,
   MsgStruct,
@@ -61,13 +63,12 @@ import {
   Next,
   Param,
   PropVar,
-  PropVarRef,
   QualifiedRef,
   RCheckAstType,
-  Ref,
   Relabel,
   Sequence,
   SupplyLocationExpr,
+  Target,
   UMinus,
 } from "./generated/ast.js";
 import { assertUnreachable, AstNode } from "langium";
@@ -79,6 +80,8 @@ import {
   InferenceRuleNotApplicable,
   NO_PARAMETER_NAME,
   Type,
+  TypirServices,
+  ValidationProblemAcceptor,
   isClassType,
 } from "typir";
 
@@ -197,23 +200,13 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           validation: (node, _operatorName, _operatorType, accept, typir) => {
             const leftType = typir.Inference.inferType(node.left);
             const rightType = typir.Inference.inferType(node.right);
-            if (leftType === typeRange || rightType === typeRange) {
-              let leftRange;
-              let rightRange;
-              try {
-                leftRange = IntRange.fromRangeExpr(node.left);
-                rightRange = IntRange.fromRangeExpr(node.right);
-              } catch (ex) {
-                const error = ex as Error;
-                return accept({
-                  message: `Cannot compare 'range' to '${
-                    leftRange === undefined ? node.left.$cstNode?.text : node.right.$cstNode?.text
-                  }': ${error.message}`,
-                  languageNode: node,
-                  languageProperty: leftRange === undefined ? "left" : "right",
-                  severity: "error",
-                });
-              }
+            if (
+              (leftType === typeRange && rightType === typeInt) ||
+              (leftType === typeInt && rightType === typeRange) ||
+              (leftType === typeRange && rightType === typeRange)
+            ) {
+              const leftRange = IntRange.fromRangeExpr(node.left);
+              const rightRange = IntRange.fromRangeExpr(node.right);
               if (!leftRange.intersects(rightRange)) {
                 accept({
                   message: `This comparison will always return '${
@@ -247,16 +240,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({
         filter: isRelabel,
         matching: () => true,
-        operands: (node: Relabel) => [node.var.ref!, node.expr], // TODO: take care of "!", find out if this is an issue
-        validation: (node, _operatorName, _operatorType, accept, typir) =>
-          typir.validation.Constraints.ensureNodeIsAssignable(node.expr, node.var.ref, accept, (actual, expected) => ({
-            message: `Variable of type '${this.getTypeName(
-              expected
-            )}' cannot be relabeled with expression of type '${this.getTypeName(actual)}'.`,
-            languageNode: node,
-            languageProperty: "expr",
-            severity: "error",
-          })),
+        operands: (node: Relabel) => [node.var.ref!, node.expr],
+        validation: (node, _operator, _functionType, accept, typir) =>
+          this.validateAssignment(node, this.getTypeName, accept, typir),
         validateArgumentsOfCalls: true,
       })
       .finish();
@@ -268,20 +254,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         filter: isAssign,
         matching: () => true,
         operands: (node: Assign) => [node.left.ref!, node.right],
-        validation: (node, _operatorName, _operatorType, accept, typir) =>
-          typir.validation.Constraints.ensureNodeIsAssignable(
-            node.right,
-            node.left.ref,
-            accept,
-            (actual, expected) => ({
-              message: `Expression of type '${this.getTypeName(
-                actual
-              )}' cannot be assigned to variable of type '${this.getTypeName(expected)}'.`,
-              languageNode: node,
-              languageProperty: "expr",
-              severity: "error",
-            })
-          ),
+        validation: (node, _operator, _functionType, accept, typir) =>
+          this.validateAssignment(node, this.getTypeName, accept, typir),
         validateArgumentsOfCalls: true,
       })
       .finish();
@@ -318,7 +292,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         .finish();
     }
 
-    // Inference rule for unary opterators
+    // Inference rule for unary operators
     type UnaryExpression = UMinus | Neg | Finally | Globally | Next | ForallObs | ExistsObs;
     const isUnaryExpression = (node: AstNode): node is UnaryExpression => {
       return isUMinus(node) || isNeg(node) || isLtolMod(node) || isForallObs(node) || isExistsObs(node);
@@ -443,7 +417,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     typir.validation.Collector.addValidationRulesForAstNodes({
       Instance: (node, accept, typir) => {
         typir.validation.Constraints.ensureNodeIsEquals(node.init, typeBool, accept, () => ({
-          message: "Agent inititalization needs to evaluate to 'bool'.",
+          message: "Agent initialization needs to evaluate to 'bool'.",
           languageProperty: "init",
           languageNode: node,
         }));
@@ -497,7 +471,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         functionName: languageNode.name,
         outputParameter: { name: NO_PARAMETER_NAME, type: "bool" },
         // TODO: This causes the lag in the guard parameters, maybe there is some way
-        //       to clear the errors before validating the new astnode
+        //       to clear the errors before validating the new AstNode
         inputParameters: languageNode.params.map((p) => ({ name: p.name, type: p })),
         associatedLanguageNode: languageNode,
       })
@@ -532,7 +506,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           languageKey: QualifiedRef,
           matching: (node: QualifiedRef) => {
             const qualifier = node.instance.ref;
-            // Handle LtolQuant inference seperately
+            // Handle LtolQuant inference separately
             if (isLtolQuant(qualifier)) return false;
 
             return qualifier?.agent.ref === languageNode;
@@ -638,6 +612,50 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
     return resultMap;
   }
+
+  protected validateAssignment(
+    node: Relabel | Assign,
+    getTypeName: (type: AnnotatedTypeAfterValidation) => string | undefined,
+    accept: ValidationProblemAcceptor<AstNode>,
+    typir: TypirServices<AstNode>
+  ) {
+    const targetNode = isRelabel(node) ? node.var.ref! : node.left.ref!;
+    const exprNode = isRelabel(node) ? node.expr : node.right;
+    const property = isRelabel(node) ? "var" : "left";
+
+    const typeInt = typir.factory.Primitives.get({ primitiveName: "int" });
+    const typeRange = typir.factory.Primitives.get({ primitiveName: "range" });
+
+    const targetType = typir.Inference.inferType(targetNode);
+    const exprType = typir.Inference.inferType(exprNode);
+
+    if ((targetType === typeRange && exprType === typeInt) || (targetType === typeRange && exprType === typeRange)) {
+      const targetRange = IntRange.fromRangeExpr(targetNode);
+      const exprRange = IntRange.fromRangeExpr(exprNode);
+
+      if (!targetRange.contains(exprRange)) {
+        accept({
+          message: `Range variable cannot be ${
+            property === "var" ? "relabeled" : "assigned"
+          } as the range '${targetRange}' does not contain the range of the expression '${exprRange}'.`,
+          languageNode: node,
+          languageProperty: property,
+          severity: "error",
+        });
+      }
+    } else {
+      typir.validation.Constraints.ensureNodeIsAssignable(exprNode, targetNode, accept, (actual, expected) => ({
+        message: `${property === "var" ? "Variable" : "Expression"} of type '${getTypeName(
+          property === "var" ? expected : actual
+        )}' cannot be ${
+          property === "var" ? "relabeled with expression of type" : "assigned to variable of type"
+        } '${getTypeName(property === "var" ? actual : expected)}'.`,
+        languageNode: node,
+        languageProperty: property,
+        severity: "error",
+      }));
+    }
+  }
 }
 
 class IntRange {
@@ -650,24 +668,22 @@ class IntRange {
   }
 
   // TODO: make this iterative?
-  public static fromRangeExpr(expr: CompoundExpr): IntRange {
-    const getRangeBoundsOfRef = (ref: Ref | PropVarRef) => {
-      const target = ref.variable.ref;
-      if (isLocal(target) || isParam(target) || isMsgStruct(target) || isPropVar(target)) {
-        if (target.rangeType !== undefined) {
-          return new this(target.rangeType.lower, target.rangeType.upper);
-        } else {
+  public static fromRangeExpr(expr: CompoundExpr | PropVar | Target): IntRange {
+    if (isRef(expr) || isPropVar(expr) || isPropVarRef(expr) || isTarget(expr) || isQualifiedRef(expr)) {
+      const decl = isPropVar(expr) || isTarget(expr) ? expr : expr.variable.ref;
+      if (isLocal(decl) || isParam(decl) || isMsgStruct(decl) || isPropVar(decl)) {
+        if (decl.rangeType !== undefined) {
+          return new this(decl.rangeType.lower, decl.rangeType.upper);
+        } else if (decl.builtinType === "int") {
           return new this(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+        } else {
+          throw new Error(
+            `Encountered declaration with unexpected type: ${decl.builtinType ?? decl.customType?.ref?.name}.`
+          );
         }
       } else {
         throw new Error("Unexpected target found.");
       }
-    };
-
-    if (isRef(expr)) {
-      return getRangeBoundsOfRef(expr);
-    } else if (isPropVarRef(expr)) {
-      return getRangeBoundsOfRef(expr);
     } else if (isNumberLiteral(expr)) {
       return new this(expr.value, expr.value);
     } else if (isBinExpr(expr)) {
@@ -681,14 +697,14 @@ class IntRange {
         case "*":
           return leftRange.times(rightRange);
         case "/":
-          return leftRange.devidedBy(rightRange);
+          return leftRange.dividedBy(rightRange);
         default:
           throw new Error("Unexpected operator found.");
       }
     } else if (isUMinus(expr)) {
       return new this(0, 0).minus(IntRange.fromRangeExpr(expr.expr));
     } else {
-      throw new Error("Unexpected expression found.");
+      throw new Error(`Unexpected expression found: '${expr.$type}'.`);
     }
   }
 
@@ -708,7 +724,7 @@ class IntRange {
     return new IntRange(Math.min(p1, p2, p3, p4), Math.max(p1, p2, p3, p4));
   }
 
-  public devidedBy(other: IntRange): IntRange {
+  public dividedBy(other: IntRange): IntRange {
     if (other.lower === 0 || other.upper === 0) {
       throw new Error("Division by a range that includes zero is not supported.");
     }
@@ -729,6 +745,9 @@ class IntRange {
   }
 
   public toString(): string {
-    return this.lower === this.upper ? `${this.lower}` : `${this.lower}..${this.upper}`;
+    if (isFinite(this.lower) && isFinite(this.upper)) {
+      return this.lower === this.upper ? `${this.lower}` : `${this.lower}..${this.upper}`;
+    }
+    return "int";
   }
 }
