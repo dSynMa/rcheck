@@ -73,6 +73,7 @@ import {
 import { assertUnreachable, AstNode } from "langium";
 import {
   AnnotatedTypeAfterValidation,
+  ClassTypeDetails,
   InferOperatorWithMultipleOperands,
   InferOperatorWithSingleOperand,
   InferenceRuleNotApplicable,
@@ -403,7 +404,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
                 throw new Error("Encountered unexpected non-class type.");
               }
             } else if (agentType instanceof Array) {
-              throw new Error("Unexpected inference problem.");
+              throw new Error("Encountered duplicate class type.");
             } else {
               assertUnreachable(agentType);
             }
@@ -473,9 +474,12 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
       // The container of Enum node is always the root node
       const documentUri = languageNode.$container.$document!.uri;
+      const enumName = `${documentUri}::${languageNode.name}`;
+
+      // Skip type definition in case of duplicates
+      if (typir.factory.Primitives.get({ primitiveName: enumName }) !== undefined) return;
 
       // Create new enum type
-      const enumName = `${documentUri}::${languageNode.name}`;
       typir.factory.Primitives.create({ primitiveName: enumName })
         .inferenceRule({
           languageKey: [Local, Param, MsgStruct, PropVar],
@@ -511,16 +515,12 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     }
 
     if (isAgent(languageNode)) {
-      const agentName = languageNode.name;
-      typir.factory.Classes.create({
-        className: agentName,
-        fields: [
-          { name: "automaton-state", type: "int" },
-          ...languageNode.locals.map((l) => ({ name: l.name, type: l })),
-          ...this.getProcessNames(languageNode).map((n) => ({ name: n, type: "bool" })),
-        ],
-        methods: [],
-      })
+      // Skip class definition in case of duplicates
+      if (languageNode.name === undefined || typir.factory.Classes.get(languageNode.name).getType() !== undefined) {
+        return;
+      }
+
+      typir.factory.Classes.create(this.getClassDetails(languageNode))
         .inferenceRuleForClassDeclaration({
           languageKey: Agent,
           matching: (node: Agent) => languageNode === node,
@@ -548,26 +548,55 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     }
   }
 
+  protected getClassDetails(agent: Agent): ClassTypeDetails<AstNode> {
+    const fieldNames = new Set<string>(["automaton-state"]);
+
+    const locals = agent.locals
+      .map((l) => {
+        if (fieldNames.has(l.name)) {
+          return undefined;
+        }
+        fieldNames.add(l.name);
+        return { name: l.name, type: l };
+      })
+      .filter((l): l is { name: string; type: Local } => l !== undefined);
+
+    const processes = this.getProcessNames(agent)
+      .map((n) => {
+        if (fieldNames.has(n)) {
+          return undefined;
+        }
+        fieldNames.add(n);
+        return { name: n, type: "bool" };
+      })
+      .filter((p): p is { name: string; type: string } => p !== undefined);
+
+    return {
+      className: agent.name,
+      fields: [{ name: "automaton-state", type: "int" }, ...processes, ...locals],
+      methods: [],
+    };
+  }
+
   protected getProcessNames(agent: Agent): string[] {
     const stack: (BaseProcess | Sequence)[] = [agent.repeat];
     const processNames: string[] = [];
 
     while (stack.length !== 0) {
-      const process = stack.pop()!;
+      const process = stack.pop();
       if (isSend(process) || isReceive(process) || isGet(process) || isSupply(process)) {
         if (process.name) {
           processNames.push(process.name);
         }
-      } else if (isChoice(process) || isSequence(process)) {
+      }
+      if (isChoice(process) || isSequence(process)) {
         stack.push(process.left);
         if (process.right !== undefined) {
           stack.push(process.right);
         }
-      } else if (isRep(process)) {
+      }
+      if (isRep(process)) {
         stack.push(process.process);
-      } else {
-        // TODO: why is this branch reachable??
-        //assertUnreachable(process satisfies never);
       }
     }
 
@@ -629,7 +658,6 @@ class IntRange {
           return new this(target.rangeType.lower, target.rangeType.upper);
         } else {
           return new this(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
-          throw new Error(`Cannot infer range bounds of variable '${expr.$cstNode?.text}' with type 'int'.`);
         }
       } else {
         throw new Error("Unexpected target found.");
