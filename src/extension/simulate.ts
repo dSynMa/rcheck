@@ -64,9 +64,10 @@ export class SimulationPanel {
             stderrChunks = stderrChunks.concat(data);
             if (data.indexOf("\n") > -1) {
                 var stderrContent = Buffer.concat(stderrChunks).toString();
-                channel.appendLine(`[DEBUG] ${stderrContent}`);
+                // channel.appendLine(`[DEBUG] ${stderrContent}`);
                 if (this.port == 0 && stderrContent.indexOf("PORT:") > -1) {
                     this.port = +stderrContent.replace("PORT: ", "").trim();
+                    channel.appendLine(`[DEBUG] PORT: ${stderrContent}`);
                 }
             }
         });
@@ -76,7 +77,8 @@ export class SimulationPanel {
             "simulator",
             `R-CHECK simulator: ${this.rcp}`,
             vscode.ViewColumn.Active,
-            {enableScripts: true}
+            // TODO persist state with getState/setState instead
+            {enableScripts: true, retainContextWhenHidden: true}
         );
     }
 
@@ -93,8 +95,8 @@ export class SimulationPanel {
     handleMessage(msg: any) {
         switch (msg.command) {
             case "back": this.back(); break;
-            case "next": this.next(); break;
-            case "reset": this.initialized = false; this.next(); break;
+            case "next": this.next(msg); break;
+            // case "reset": this.initialized = false; this.next("0"); break;
         }
     }
 
@@ -107,14 +109,16 @@ export class SimulationPanel {
         channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
     }
 
-    async next() {
+    async next(msg: any) {
         channel.appendLine("next");
-        const url = `${this.serverUrl()}/interpretNext?reset=${!this.initialized}`
+        let url = `${this.serverUrl()}/interpretNext?reset=${!this.initialized}`;
+        if (msg.data) { url = `${url}&index=${msg.data}`; }
         channel.appendLine(`[DEBUG] ${url}`);
         const response = await axios.get(url);
         channel.appendLine(`[DEBUG] ${response.status}`);
         channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
         channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.transitions)}`);
+        channel.appendLine(`[DEBUG] ${JSON.stringify(msg)}`);
         this.panel?.webview.postMessage({ command: 'update-transitions', content: response.data.transitions });
 
         this.initialized = true;

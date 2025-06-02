@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulator: {%=fname%}</title>
     <script type="module" src="{%= elementsUri %}"></script>
-
 </head>
 
 <body>
@@ -21,30 +20,30 @@
         <vscode-button onclick="next()">Next</vscode-button>
         <vscode-button secondary onclick="back()">Back</vscode-button>
     </vscode-form-group>
-    <script>
-        const vscode = acquireVsCodeApi();
-        function next() { vscode.postMessage({ command: 'next' }); }
-        function back() { vscode.postMessage({ command: 'back' }); }
+<script>
+const vscode = acquireVsCodeApi();
+const select = document.getElementById("select-transition");
+function next() { vscode.postMessage({ command: 'next', data: select.value }); }
+function back() { vscode.postMessage({ command: 'back' }); }
 
-        const select = document.getElementById("select-transition");
 
-        window.addEventListener('message', event => {
-            const message = event.data; // The JSON data our extension sent
-            switch (message.command) {
-                case 'update-transitions':
-                    while (select.firstChild) { select.removeChild(select.lastChild); }
-                    for (let index = 0; index < message.content.length; index++) {
-                        const element = message.content[index];
-                        const option = document.createElement("vscode-option");
-                        option.setAttribute("description", element.send)
-                        option.textContent = element.sender + '-> ' + element.receivers.join(", ");
-                        select.appendChild(option);
-                    }
-                    break;
+window.addEventListener('message', event => {
+    const message = event.data; // The JSON data our extension sent
+    switch (message.command) {
+        case 'update-transitions':
+            while (select.firstChild) { select.removeChild(select.lastChild); }
+            for (let index = 0; index < message.content.length; index++) {
+                const element = message.content[index];
+                const option = document.createElement("vscode-option");
+                option.setAttribute("description", element.send)
+                option.setAttribute("value", index);
+                option.textContent = element.sender + '-> {' + element.receivers.join(", ") + '}';
+                select.appendChild(option);
             }
-        });
-    </script>
-    <!-- <script type="module" src="node_modules/@vscode-elements/elements/dist/vscode-button/index.js"></script> -->
+            break;
+    }
+});
+</script>
 </body>
 
 </html>
