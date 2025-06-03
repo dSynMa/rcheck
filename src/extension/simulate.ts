@@ -107,6 +107,13 @@ export class SimulationPanel {
         const response = await axios.get(url);
         channel.appendLine(`[DEBUG] ${response.status}`);
         channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
+        if (response.data.hasOwnProperty("error")) {
+            vscode.window.showErrorMessage(response.data.error);
+        } else {
+            this.panel?.webview.postMessage({ command: 'undo-step' });
+            this.panel?.webview.postMessage({ command: 'update-transitions', content: response.data.transitions });
+            this.initialized = true;
+        }
     }
 
     async next(msg: any) {
@@ -116,12 +123,14 @@ export class SimulationPanel {
         channel.appendLine(`[DEBUG] ${url}`);
         const response = await axios.get(url);
         channel.appendLine(`[DEBUG] ${response.status}`);
-        channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
-        channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.transitions)}`);
-        channel.appendLine(`[DEBUG] ${JSON.stringify(msg)}`);
-        this.panel?.webview.postMessage({ command: 'update-transitions', content: response.data.transitions });
-
-        this.initialized = true;
+        channel.appendLine(`[DEBUG] ${JSON.stringify(response.data)}`);
+        if (response.data.hasOwnProperty("error")) {
+            vscode.window.showErrorMessage(response.data.error);
+        } else {
+            this.panel?.webview.postMessage({ command: 'append-step', content: response.data });
+            this.panel?.webview.postMessage({ command: 'update-transitions', content: response.data.transitions });
+            this.initialized = true;
+        }
     }
     
     async killServer() {
