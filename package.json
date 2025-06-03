@@ -44,8 +44,6 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@codingame/monaco-vscode-editor-service-override": "~3.2.3",
-        "@codingame/monaco-vscode-keybindings-service-override": "~3.2.3",
         "@types/ejs": "^3.1.5",
         "@vscode-elements/elements": "^1.16.1",
         "axios": "^1.9.0",
@@ -53,8 +51,6 @@
         "commander": "~11.0.0",
         "ejs": "^3.1.10",
         "langium": "~3.2.0",
-        "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@~3.2.3",
-        "monaco-editor-wrapper": "~4.0.2",
         "monaco-languageclient": "~8.1.1",
         "vscode-languageclient": "~9.0.1",
         "vscode-languageserver": "~9.0.1"
@@ -66,13 +62,13 @@
         "@typescript-eslint/eslint-plugin": "~7.3.1",
         "@typescript-eslint/parser": "~7.3.1",
         "concurrently": "~8.2.1",
-        "esbuild": "^0.20.2",
+        "esbuild": "^0.25.5",
         "eslint": "~8.57.0",
         "http-server": "~14.1.1",
         "langium-cli": "~3.2.0",
         "typescript": "~5.1.6",
-        "vite": "~5.4.14",
-        "vitest": "~1.4.0",
+        "vite": "^6.3.5",
+        "vitest": "^3.2.0",
         "vscode": "npm:@codingame/monaco-vscode-api@~3.2.3"
     },
     "volta": {
