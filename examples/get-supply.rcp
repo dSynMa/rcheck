@@ -12,7 +12,7 @@ agent Client
     repeat: (
             splyAtSelf: {true} SUPPLY@(myself)()[]
             +
-            getAtX: {true} GET@(x)[]
+            getAtX: {true} GET@(x)()[]
             +
             bcastSend: {true} *! true(MSG := myself)[x := myself]
             + 
