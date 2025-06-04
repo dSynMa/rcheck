@@ -3,11 +3,9 @@ import {
   Agent,
   Assign,
   AutomatonState,
-  BaseProcess,
   BinExpr,
   BinObs,
   Box,
-  CompoundExpr,
   Diamond,
   Enum,
   ExistsObs,
@@ -27,7 +25,6 @@ import {
   isCase,
   isChannelObs,
   isChannelRef,
-  isChoice,
   isDiamond,
   isEnum,
   isExistsObs,
@@ -45,18 +42,12 @@ import {
   isNumberLiteral,
   isParam,
   isPropVar,
-  isPropVarRef,
-  isQualifiedRef,
   isRange,
   isReceive,
-  isRef,
   isRelabel,
-  isRep,
   isSend,
   isSenderObs,
-  isSequence,
   isSupply,
-  isTarget,
   isUMinus,
   Local,
   MsgStruct,
@@ -69,16 +60,12 @@ import {
   Receive,
   Relabel,
   Send,
-  Sequence,
   Supply,
   SupplyLocationExpr,
-  Target,
   UMinus,
 } from "./generated/ast.js";
 import { assertUnreachable, AstNode } from "langium";
 import {
-  AnnotatedTypeAfterValidation,
-  ClassTypeDetails,
   InferOperatorWithMultipleOperands,
   InferOperatorWithSingleOperand,
   InferenceRuleNotApplicable,
@@ -88,6 +75,7 @@ import {
   ValidationProblemAcceptor,
   isClassType,
 } from "typir";
+import { getClassDetails, getTypeName, intersectMaps, IntRange, validateAssignment } from "./util.js";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
   onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
@@ -225,9 +213,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
               typir.validation.Constraints.ensureNodeIsEquals(node.left, node.right, accept, (actual, expected) => ({
                 message: `This comparison will always return '${node.operator === "!=" ? "true" : "false"}' as '${
                   node.left.$cstNode?.text
-                }' and '${node.right.$cstNode?.text}' have the different types '${this.getTypeName(
+                }' and '${node.right.$cstNode?.text}' have the different types '${getTypeName(
                   actual
-                )}' and '${this.getTypeName(expected)}'.`,
+                )}' and '${getTypeName(expected)}'.`,
                 languageNode: node,
                 languageProperty: "operator",
                 severity: "warning",
@@ -246,7 +234,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: () => true,
         operands: (node: Relabel) => [node.var.ref!, node.expr],
         validation: (node, _operator, _functionType, accept, typir) =>
-          this.validateAssignment(node, this.getTypeName, accept, typir),
+          validateAssignment(node, getTypeName, accept, typir),
         validateArgumentsOfCalls: true,
       })
       .finish();
@@ -259,7 +247,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: () => true,
         operands: (node: Assign) => [node.left.ref!, node.right],
         validation: (node, _operator, _functionType, accept, typir) =>
-          this.validateAssignment(node, this.getTypeName, accept, typir),
+          validateAssignment(node, getTypeName, accept, typir),
         validateArgumentsOfCalls: true,
       })
       .finish();
@@ -388,7 +376,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
             }
           });
 
-          const intersection = this.intersectMaps(agentFields);
+          const intersection = intersectMaps(agentFields);
           const variableType = intersection.get(languageNode.variable.$refText);
 
           if (variableType === undefined) {
@@ -441,9 +429,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       typir: TypirServices<AstNode>
     ) => {
       typir.validation.Constraints.ensureNodeIsEquals(node.psi, typeBool, accept, (actual, expected) => ({
-        message: `Type mismatch in command guard expression: expected '${this.getTypeName(
+        message: `Type mismatch in command guard expression: expected '${getTypeName(
           expected
-        )}', but got '${this.getTypeName(actual)}'.`,
+        )}', but got '${getTypeName(actual)}'.`,
         languageProperty: "psi",
         languageNode: node,
       }));
@@ -454,9 +442,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       typir: TypirServices<AstNode>
     ) => {
       typir.validation.Constraints.ensureNodeIsEquals(node.chanExpr, typeChannel, accept, (actual, expected) => ({
-        message: `Type mismatch in command channel expression: expected '${this.getTypeName(
+        message: `Type mismatch in command channel expression: expected '${getTypeName(
           expected
-        )}', but got '${this.getTypeName(actual)}'.`,
+        )}', but got '${getTypeName(actual)}'.`,
         languageProperty: "chanExpr",
         languageNode: node,
       }));
@@ -467,7 +455,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       typir: TypirServices<AstNode>
     ) => {
       typir.validation.Constraints.ensureNodeIsEquals(node.where, typeLocation, accept, (actual, expected) => ({
-        message: `Type mismatch in command where: expected '${this.getTypeName(expected)}', but got '${this.getTypeName(
+        message: `Type mismatch in command where: expected '${getTypeName(expected)}', but got '${getTypeName(
           actual
         )}'.`,
         languageProperty: "where",
@@ -496,9 +484,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         validateCmdHeader(node, accept, typir);
         validateChannelExpr(node, accept, typir);
         typir.validation.Constraints.ensureNodeIsEquals(node.sendGuard, typeBool, accept, (actual, expected) => ({
-          message: `Type mismatch in command guard: expected '${this.getTypeName(
-            expected
-          )}', but got '${this.getTypeName(actual)}'.`,
+          message: `Type mismatch in command guard: expected '${getTypeName(expected)}', but got '${getTypeName(
+            actual
+          )}'.`,
           languageProperty: "sendGuard",
           languageNode: node,
         }));
@@ -573,22 +561,22 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
       const typeBool = typir.factory.Primitives.get({ primitiveName: "bool" });
 
-      typir.factory.Classes.create(this.getClassDetails(languageNode))
+      typir.factory.Classes.create(getClassDetails(languageNode))
         .inferenceRuleForClassDeclaration({
           languageKey: Agent,
           matching: (node: Agent) => languageNode === node,
           validation: (node, _type, accept, typir) => {
             typir.validation.Constraints.ensureNodeIsEquals(node.init, typeBool, accept, (actual, expected) => ({
-              message: `Type mismatch in agent initialization: expected '${this.getTypeName(
+              message: `Type mismatch in agent initialization: expected '${getTypeName(
                 expected
-              )}', but got '${this.getTypeName(actual)}'.`,
+              )}', but got '${getTypeName(actual)}'.`,
               languageProperty: "init",
               languageNode: node.init,
             }));
             typir.validation.Constraints.ensureNodeIsEquals(node.recvguard, typeBool, accept, (actual, expected) => ({
-              message: `Type mismatch in agent receive-guard: expected '${this.getTypeName(
+              message: `Type mismatch in agent receive-guard: expected '${getTypeName(
                 expected
-              )}', but got '${this.getTypeName(actual)}'.`,
+              )}', but got '${getTypeName(actual)}'.`,
               languageProperty: "recvguard",
               languageNode: node.recvguard,
             }));
@@ -612,234 +600,5 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         })
         .finish();
     }
-  }
-
-  protected getClassDetails(agent: Agent): ClassTypeDetails<AstNode> {
-    const fieldNames = new Set<string>(["automaton-state"]);
-
-    const locals = agent.locals
-      .map((l) => {
-        if (fieldNames.has(l.name)) {
-          return undefined;
-        }
-        fieldNames.add(l.name);
-        return { name: l.name, type: l };
-      })
-      .filter((l): l is { name: string; type: Local } => l !== undefined);
-
-    const processes = this.getProcessNames(agent)
-      .map((n) => {
-        if (fieldNames.has(n)) {
-          return undefined;
-        }
-        fieldNames.add(n);
-        return { name: n, type: "bool" };
-      })
-      .filter((p): p is { name: string; type: string } => p !== undefined);
-
-    return {
-      className: agent.name,
-      fields: [{ name: "automaton-state", type: "int" }, ...processes, ...locals],
-      methods: [],
-    };
-  }
-
-  protected getProcessNames(agent: Agent): string[] {
-    const stack: (BaseProcess | Sequence)[] = [agent.repeat];
-    const processNames: string[] = [];
-
-    while (stack.length !== 0) {
-      const process = stack.pop();
-      if (isSend(process) || isReceive(process) || isGet(process) || isSupply(process)) {
-        if (process.name) {
-          processNames.push(process.name);
-        }
-      }
-      if (isChoice(process) || isSequence(process)) {
-        stack.push(process.left);
-        if (process.right !== undefined) {
-          stack.push(process.right);
-        }
-      }
-      if (isRep(process)) {
-        stack.push(process.process);
-      }
-    }
-
-    return processNames;
-  }
-
-  protected getTypeName(type: AnnotatedTypeAfterValidation): string | undefined {
-    return type.name.split("::").pop();
-  }
-
-  protected intersectMaps<K, V>(maps: Map<K, V>[]): Map<K, V> {
-    if (maps.length === 0) {
-      return new Map<K, V>();
-    }
-    if (maps.length === 1) {
-      return new Map(maps[0]);
-    }
-
-    const resultMap = new Map<K, V>();
-    const firstMap = maps[0];
-
-    // Iterate over the entries of the first map
-    for (const [key, value] of firstMap.entries()) {
-      let isInAllMaps = true;
-
-      // Check if this key exists in all other maps with the same value
-      for (let i = 1; i < maps.length; i++) {
-        const currentMap = maps[i];
-        if (!currentMap.has(key) || currentMap.get(key) !== value) {
-          isInAllMaps = false;
-          break;
-        }
-      }
-      // If the key and value matched across all maps, add it to the result
-      if (isInAllMaps) {
-        resultMap.set(key, value);
-      }
-    }
-
-    return resultMap;
-  }
-
-  protected validateAssignment(
-    node: Relabel | Assign,
-    getTypeName: (type: AnnotatedTypeAfterValidation) => string | undefined,
-    accept: ValidationProblemAcceptor<AstNode>,
-    typir: TypirServices<AstNode>
-  ) {
-    const targetNode = isRelabel(node) ? node.var.ref! : node.left.ref!;
-    const exprNode = isRelabel(node) ? node.expr : node.right;
-    const property = isRelabel(node) ? "var" : "left";
-
-    const typeInt = typir.factory.Primitives.get({ primitiveName: "int" });
-    const typeRange = typir.factory.Primitives.get({ primitiveName: "range" });
-
-    const targetType = typir.Inference.inferType(targetNode);
-    const exprType = typir.Inference.inferType(exprNode);
-
-    if ((targetType === typeRange && exprType === typeInt) || (targetType === typeRange && exprType === typeRange)) {
-      const targetRange = IntRange.fromRangeExpr(targetNode);
-      const exprRange = IntRange.fromRangeExpr(exprNode);
-
-      if (!targetRange.contains(exprRange)) {
-        accept({
-          message: `Range variable cannot be ${
-            property === "var" ? "relabeled" : "assigned"
-          } as the range '${targetRange}' does not contain the range of the expression '${exprRange}'.`,
-          languageNode: node,
-          languageProperty: property,
-          severity: "error",
-        });
-      }
-    } else {
-      typir.validation.Constraints.ensureNodeIsAssignable(exprNode, targetNode, accept, (actual, expected) => ({
-        message: `${property === "var" ? "Variable" : "Expression"} of type '${getTypeName(
-          property === "var" ? expected : actual
-        )}' cannot be ${
-          property === "var" ? "relabeled with expression of type" : "assigned to variable of type"
-        } '${getTypeName(property === "var" ? actual : expected)}'.`,
-        languageNode: node,
-        languageProperty: property,
-        severity: "error",
-      }));
-    }
-  }
-}
-
-class IntRange {
-  private lower: number;
-  private upper: number;
-
-  constructor(lower: number, upper: number) {
-    this.lower = lower;
-    this.upper = upper;
-  }
-
-  // TODO: make this iterative?
-  public static fromRangeExpr(expr: CompoundExpr | PropVar | Target): IntRange {
-    if (isRef(expr) || isPropVar(expr) || isPropVarRef(expr) || isTarget(expr) || isQualifiedRef(expr)) {
-      const decl = isPropVar(expr) || isTarget(expr) ? expr : expr.variable.ref;
-      if (isLocal(decl) || isParam(decl) || isMsgStruct(decl) || isPropVar(decl)) {
-        if (decl.rangeType !== undefined) {
-          return new this(decl.rangeType.lower, decl.rangeType.upper);
-        } else if (decl.builtinType === "int") {
-          return new this(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
-        } else {
-          throw new Error(
-            `Encountered declaration with unexpected type: ${decl.builtinType ?? decl.customType?.ref?.name}.`
-          );
-        }
-      } else {
-        throw new Error("Unexpected target found.");
-      }
-    } else if (isNumberLiteral(expr)) {
-      return new this(expr.value, expr.value);
-    } else if (isBinExpr(expr)) {
-      const leftRange = IntRange.fromRangeExpr(expr.left);
-      const rightRange = IntRange.fromRangeExpr(expr.right);
-      switch (expr.operator) {
-        case "+":
-          return leftRange.plus(rightRange);
-        case "-":
-          return leftRange.minus(rightRange);
-        case "*":
-          return leftRange.times(rightRange);
-        case "/":
-          return leftRange.dividedBy(rightRange);
-        default:
-          throw new Error("Unexpected operator found.");
-      }
-    } else if (isUMinus(expr)) {
-      return new this(0, 0).minus(IntRange.fromRangeExpr(expr.expr));
-    } else {
-      throw new Error(`Unexpected expression found: '${expr.$type}'.`);
-    }
-  }
-
-  public plus(other: IntRange): IntRange {
-    return new IntRange(this.lower + other.lower, this.upper + other.upper);
-  }
-
-  public minus(other: IntRange): IntRange {
-    return new IntRange(this.lower - other.upper, this.upper - other.lower);
-  }
-
-  public times(other: IntRange): IntRange {
-    const p1 = this.lower * other.lower;
-    const p2 = this.lower * other.upper;
-    const p3 = this.upper * other.lower;
-    const p4 = this.upper * other.upper;
-    return new IntRange(Math.min(p1, p2, p3, p4), Math.max(p1, p2, p3, p4));
-  }
-
-  public dividedBy(other: IntRange): IntRange {
-    if (other.lower === 0 || other.upper === 0) {
-      throw new Error("Division by a range that includes zero is not supported.");
-    }
-    const d1 = Math.trunc(this.lower / other.lower);
-    const d2 = Math.trunc(this.lower / other.upper);
-    const d3 = Math.trunc(this.upper / other.lower);
-    const d4 = Math.trunc(this.upper / other.upper);
-
-    return new IntRange(Math.min(d1, d2, d3, d4), Math.max(d1, d2, d3, d4));
-  }
-
-  public intersects(other: IntRange): boolean {
-    return this.lower <= other.upper && other.lower <= this.upper;
-  }
-
-  public contains(other: IntRange): boolean {
-    return this.lower <= other.lower && this.upper >= other.upper;
-  }
-
-  public toString(): string {
-    if (isFinite(this.lower) && isFinite(this.upper)) {
-      return this.lower === this.upper ? `${this.lower}` : `${this.lower}..${this.upper}`;
-    }
-    return "int";
   }
 }
