@@ -172,8 +172,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         .inferenceRule(binaryInferenceRule)
         .finish();
     }
-    // TODO: what about 'U' | 'R' | 'W'?
-    for (const operator of ["&", "|", "->"]) {
+    for (const operator of ["&", "|", "->", "U", "R", "W"]) {
       typir.factory.Operators.createBinary({
         name: operator,
         signature: { left: typeBool, right: typeBool, return: typeBool },
@@ -449,8 +448,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         languageNode: node,
       }));
     };
-    const validateGetSupplyLocation = (
-      node: Get | Supply,
+    const validateSupplyLocation = (
+      node: Supply,
       accept: ValidationProblemAcceptor<AstNode>,
       typir: TypirServices<AstNode>
     ) => {
@@ -461,6 +460,23 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         languageProperty: "where",
         languageNode: node,
       }));
+    };
+    const validateGetLocation = (
+      node: Get,
+      accept: ValidationProblemAcceptor<AstNode>,
+      typir: TypirServices<AstNode>
+    ) => {
+      const actual = typir.Inference.inferType(node.where);
+      if (actual instanceof Type && actual.getIdentifier() !== "bool" && actual.getIdentifier() !== "location") {
+        accept({
+          message: `Type mismatch in command where: expected 'bool | location', but got '${
+            actual instanceof Type ? typir.Printer.printTypeName(actual) : "inference problem"
+          }'.`,
+          languageProperty: "where",
+          languageNode: node,
+          severity: "error",
+        });
+      }
     };
 
     typir.validation.Collector.addValidationRulesForAstNodes({
@@ -497,11 +513,36 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       },
       Get: (node, accept, typir) => {
         validateCmdHeader(node, accept, typir);
-        validateGetSupplyLocation(node, accept, typir);
+        validateGetLocation(node, accept, typir);
       },
       Supply: (node, accept, typir) => {
         validateCmdHeader(node, accept, typir);
-        validateGetSupplyLocation(node, accept, typir);
+        validateSupplyLocation(node, accept, typir);
+      },
+      Guard: (node, accept, typir) => {
+        typir.validation.Constraints.ensureNodeIsEquals(node.body, typeBool, accept, (actual, expected) => ({
+          message: `Type mismatch in guard definition: expected '${getTypeName(expected)}', but got '${getTypeName(
+            actual
+          )}'.`,
+          languageProperty: "body",
+          languageNode: node.body,
+        }));
+      },
+      Agent: (node, accept, typir) => {
+        typir.validation.Constraints.ensureNodeIsEquals(node.init, typeBool, accept, (actual, expected) => ({
+          message: `Type mismatch in agent initialization: expected '${getTypeName(expected)}', but got '${getTypeName(
+            actual
+          )}'.`,
+          languageProperty: "init",
+          languageNode: node.init,
+        }));
+        typir.validation.Constraints.ensureNodeIsEquals(node.recvguard, typeBool, accept, (actual, expected) => ({
+          message: `Type mismatch in agent receive-guard: expected '${getTypeName(expected)}', but got '${getTypeName(
+            actual
+          )}'.`,
+          languageProperty: "recvguard",
+          languageNode: node.recvguard,
+        }));
       },
     });
   }
@@ -559,28 +600,10 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         return;
       }
 
-      const typeBool = typir.factory.Primitives.get({ primitiveName: "bool" });
-
       typir.factory.Classes.create(getClassDetails(languageNode))
         .inferenceRuleForClassDeclaration({
           languageKey: Agent,
           matching: (node: Agent) => languageNode === node,
-          validation: (node, _type, accept, typir) => {
-            typir.validation.Constraints.ensureNodeIsEquals(node.init, typeBool, accept, (actual, expected) => ({
-              message: `Type mismatch in agent initialization: expected '${getTypeName(
-                expected
-              )}', but got '${getTypeName(actual)}'.`,
-              languageProperty: "init",
-              languageNode: node.init,
-            }));
-            typir.validation.Constraints.ensureNodeIsEquals(node.recvguard, typeBool, accept, (actual, expected) => ({
-              message: `Type mismatch in agent receive-guard: expected '${getTypeName(
-                expected
-              )}', but got '${getTypeName(actual)}'.`,
-              languageProperty: "recvguard",
-              languageNode: node.recvguard,
-            }));
-          },
         })
         .inferenceRuleForFieldAccess({
           languageKey: QualifiedRef,
