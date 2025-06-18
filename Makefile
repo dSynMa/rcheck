@@ -2,6 +2,8 @@
 
 all: build test package
 
+VSCE = ./node_modules/@vscode/vsce/vsce
+
 grammar = src/language/r-check.langium
 src = $(wildcard src/**/*.ts)
 bin = $(wildcard src/**/*.ts)
@@ -31,7 +33,7 @@ package: rcheck-$(version).vsix
 
 rcheck-$(version).vsix: package.json out/extension/main.js bin/$(jar)
 #	The option --allow-package-secrets sendgrid prevents a false positive when scanning for secrets in the compiled javascript
-	vsce package --allow-package-secrets sendgrid
+	${VSCE} package --allow-package-secrets sendgrid
 
 # We need to do this little trick since 'test' is an actual directory name
 test: tests
