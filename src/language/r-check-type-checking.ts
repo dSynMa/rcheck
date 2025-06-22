@@ -544,6 +544,14 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           languageNode: node.recvguard,
         }));
       },
+      Instance: (node, accept, typir) =>
+        typir.validation.Constraints.ensureNodeIsEquals(node.init, typeBool, accept, (actual, expected) => ({
+          message: `Type mismatch in instance initialization: expected '${getTypeName(
+            expected
+          )}', but got '${getTypeName(actual)}'.`,
+          languageProperty: "init",
+          languageNode: node.init,
+        })),
     });
   }
 

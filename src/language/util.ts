@@ -253,7 +253,7 @@ export const validateAssignment = (
     if (!targetRange.contains(exprRange)) {
       accept({
         message: `Range variable cannot be ${
-          property === "var" ? "relabeled" : "assigned"
+          property === "var" ? "relabelled" : "assigned"
         } as the range '${targetRange}' does not contain the range of the expression '${exprRange}'.`,
         languageNode: node,
         languageProperty: property,
@@ -265,7 +265,7 @@ export const validateAssignment = (
       message: `${property === "var" ? "Variable" : "Expression"} of type '${getTypeName(
         property === "var" ? expected : actual
       )}' cannot be ${
-        property === "var" ? "relabeled with expression of type" : "assigned to variable of type"
+        property === "var" ? "relabelled with expression of type" : "assigned to variable of type"
       } '${getTypeName(property === "var" ? actual : expected)}'.`,
       languageNode: node,
       languageProperty: property,
