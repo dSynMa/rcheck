@@ -1,0 +1,13 @@
+enum channel {radio, speaker}
+
+property-variables: friendly : bool
+
+agent Droid
+    local: status : int, mood : bool
+    init: true
+    relabel:
+        friendly <- mood
+    receive-guard: true
+    repeat: {true} *? [mood := true]
+
+system = Droid(R2D2, true) || Droid(C3PO, true)
