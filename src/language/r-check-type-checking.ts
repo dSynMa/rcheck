@@ -1,80 +1,15 @@
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
-import {
-  Agent,
-  Assign,
-  AutomatonState,
-  BinExpr,
-  BinObs,
-  Box,
-  Diamond,
-  Enum,
-  ExistsObs,
-  Finally,
-  ForallObs,
-  Get,
-  Globally,
-  Guard,
-  GuardCall,
-  isAgent,
-  isAssign,
-  isBinExpr,
-  isBinObs,
-  isBoolLiteral,
-  isBox,
-  isBroadcast,
-  isCase,
-  isChannelObs,
-  isChannelRef,
-  isDiamond,
-  isEnum,
-  isExistsObs,
-  isForallObs,
-  isGet,
-  isGuard,
-  isInstance,
-  isLiteralObs,
-  isLocal,
-  isLtolMod,
-  isLtolQuant,
-  isMsgStruct,
-  isMyself,
-  isNeg,
-  isNumberLiteral,
-  isParam,
-  isPropVar,
-  isRange,
-  isReceive,
-  isRelabel,
-  isSend,
-  isSenderObs,
-  isSupply,
-  isUMinus,
-  Local,
-  MsgStruct,
-  Neg,
-  Next,
-  Param,
-  PropVar,
-  QualifiedRef,
-  RCheckAstType,
-  Receive,
-  Relabel,
-  Send,
-  Supply,
-  SupplyLocationExpr,
-  UMinus,
-} from "./generated/ast.js";
+import { Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs, Finally,
+  ForallObs, Get, Globally, Guard, GuardCall, isAgent, isAssign, isBinExpr, isBinObs, isBoolLiteral,
+  isBox, isBroadcast, isCase, isChannelObs, isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs,
+  isGet, isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct, isMyself,
+  isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive, isRelabel, isSend, isSenderObs,
+  isSupply, isUMinus, Local, MsgStruct, Neg, Next, Param, PropVar, QualifiedRef, RCheckAstType,
+  Receive, Relabel, Send, Supply, SupplyLocationExpr, UMinus } from "./generated/ast.js";
 import { assertUnreachable, AstNode } from "langium";
-import {
-  InferOperatorWithMultipleOperands,
-  InferOperatorWithSingleOperand,
-  InferenceRuleNotApplicable,
-  NO_PARAMETER_NAME,
-  Type,
-  TypirServices,
-  ValidationProblemAcceptor,
-  isClassType,
-} from "typir";
+import { InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand,
+  InferenceRuleNotApplicable, NO_PARAMETER_NAME, Type, TypirServices,
+  ValidationProblemAcceptor, isClassType } from "typir";
 import { getClassDetails, getTypeName, intersectMaps, IntRange, validateAssignment } from "./util.js";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
@@ -99,7 +34,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       })
       .finish();
 
-    const typeRange = typir.factory.Primitives.create({ primitiveName: "range" })
+    const typeRange = typir.factory.Primitives.create({
+      primitiveName: "range",
+    })
       .inferenceRule({ filter: isRange })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
@@ -109,7 +46,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
     typir.Conversion.markAsConvertible(typeRange, typeInt, "IMPLICIT_EXPLICIT");
 
-    const typeLocation = typir.factory.Primitives.create({ primitiveName: "location" })
+    const typeLocation = typir.factory.Primitives.create({
+      primitiveName: "location",
+    })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "location",
@@ -122,7 +61,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isInstance })
       .finish();
 
-    const typeChannel = typir.factory.Primitives.create({ primitiveName: "channel" })
+    const typeChannel = typir.factory.Primitives.create({
+      primitiveName: "channel",
+    })
       .inferenceRule({ filter: isChannelRef })
       .inferenceRule({ filter: isBroadcast })
       .inferenceRule({
@@ -306,7 +247,10 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule(unaryInferenceRule)
       .finish();
     for (const operator of ["!", "F", "G", "X", "forall", "exists"]) {
-      typir.factory.Operators.createUnary({ name: operator, signature: { operand: typeBool, return: typeBool } })
+      typir.factory.Operators.createUnary({
+        name: operator,
+        signature: { operand: typeBool, return: typeBool },
+      })
         .inferenceRule(unaryInferenceRule)
         .finish();
     }
@@ -586,7 +530,10 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         outputParameter: { name: NO_PARAMETER_NAME, type: "bool" },
         // TODO: This causes the lag in the guard parameters, maybe there is some way
         //       to clear the errors before validating the new AstNode
-        inputParameters: languageNode.params.map((p) => ({ name: p.name, type: p })),
+        inputParameters: languageNode.params.map((p) => ({
+          name: p.name,
+          type: p,
+        })),
         associatedLanguageNode: languageNode,
       })
         .inferenceRuleForDeclaration({
