@@ -528,8 +528,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       typir.factory.Functions.create({
         functionName: languageNode.name,
         outputParameter: { name: NO_PARAMETER_NAME, type: "bool" },
-        // TODO: This causes the lag in the guard parameters, maybe there is some way
-        //       to clear the errors before validating the new AstNode
         inputParameters: languageNode.params.map((p) => ({
           name: p.name,
           type: p,

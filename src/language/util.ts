@@ -54,7 +54,6 @@ export class IntRange {
     this.upper = upper;
   }
 
-  // TODO: make this iterative?
   public static fromRangeExpr(expr: CompoundExpr | PropVar | Target): IntRange {
     if (isRef(expr) || isPropVar(expr) || isPropVarRef(expr) || isTarget(expr) || isQualifiedRef(expr)) {
       const decl = isPropVar(expr) || isTarget(expr) ? expr : expr.variable.ref;
