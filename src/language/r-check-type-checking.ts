@@ -10,7 +10,7 @@ import { assertUnreachable, AstNode } from "langium";
 import { InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand,
   InferenceRuleNotApplicable, NO_PARAMETER_NAME, Type, TypirServices,
   ValidationProblemAcceptor, isClassType } from "typir";
-import { getClassDetails, getTypeName, intersectMaps, IntRange, validateAssignment } from "./util.js";
+import { getClassDetails, getTypeName, intersectMaps, IntRange, isComparisonOp, validateAssignment } from "./util.js";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
   onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
@@ -496,6 +496,51 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
           languageProperty: "init",
           languageNode: node.init,
         })),
+      CompoundExpr: (node, accept, typir) => {
+        if (node.$type !== "BinExpr" || !isComparisonOp(node.operator)) {
+          return;
+        }
+        const leftType = typir.Inference.inferType(node.left);
+        const rightType = typir.Inference.inferType(node.right);
+        if ((leftType === typeRange || leftType === typeInt) && (rightType === typeInt || rightType === typeRange)) {
+          const leftRange = IntRange.fromRangeExpr(node.left);
+          const rightRange = IntRange.fromRangeExpr(node.right);
+          const { isAlwaysTrue, isAlwaysFalse } = IntRange.isStaticOutcome(leftRange, rightRange, node.operator);
+          if (!isAlwaysTrue && !isAlwaysFalse) {
+            return;
+          }
+          let reason;
+          switch (node.operator) {
+            case "<":
+              reason = isAlwaysTrue
+                ? `every value of '${leftRange}' is strictly less than every value of '${rightRange}'`
+                : `every value of '${leftRange}' is greater than or equal to every value of '${rightRange}'`;
+              break;
+            case "<=":
+              reason = isAlwaysTrue
+                ? `the max of '${leftRange}' is less than or equal to the min of '${rightRange}'`
+                : `the min of '${leftRange}' is greater than the max of '${rightRange}'`;
+              break;
+            case ">":
+              reason = isAlwaysTrue
+                ? `every value of '${leftRange}' is strictly greater than every value of '${rightRange}'`
+                : `every value of '${leftRange}' is less than or equal to every value of '${rightRange}'`;
+              break;
+            case ">=":
+              reason = isAlwaysTrue
+                ? `the min of '${leftRange}' is greater than or equal to the max of '${rightRange}'`
+                : `the max of '${leftRange}' is less than the min of '${rightRange}'`;
+              break;
+          }
+
+          accept({
+            message: `This comparison will always return '${isAlwaysTrue ? "true" : "false"}' as ${reason}.`,
+            languageNode: node,
+            languageProperty: "operator",
+            severity: "warning",
+          });
+        }
+      },
     });
   }
 

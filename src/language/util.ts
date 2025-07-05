@@ -1,6 +1,6 @@
 import { NodeFileSystem } from "langium/node";
 import { extractAstNode } from "../cli/cli-util.js";
-import { Agent, Assign, BaseProcess, CompoundExpr, isBinExpr, isChoice, isGet, isLocal, isMsgStruct, isNumberLiteral, isParam, isPropVar, isPropVarRef, isQualifiedRef, isReceive, isRef, isRelabel, isRep, isSend, isSequence, isSupply, isTarget, isUMinus, Local, Model, PropVar, Relabel, Sequence, Target } from "./generated/ast.js";
+import { Agent, Assign, BaseProcess, BinExpr, CompoundExpr, isBinExpr, isChoice, isGet, isLocal, isMsgStruct, isNumberLiteral, isParam, isPropVar, isPropVarRef, isQualifiedRef, isReceive, isRef, isRelabel, isRep, isSend, isSequence, isSupply, isTarget, isUMinus, Local, Model, PropVar, Relabel, Sequence, Target } from "./generated/ast.js";
 import { createRCheckServices } from "./r-check-module.js";
 import { AstNode } from "langium";
 import { ClassTypeDetails, AnnotatedTypeAfterValidation, ValidationProblemAcceptor, TypirServices } from "typir";
@@ -44,6 +44,8 @@ const getAstReplacer = () => {
         return value;
     };
 };
+
+type ComparisonOp = "<" | "<=" | ">" | ">=";
 
 export class IntRange {
   private lower: number;
@@ -94,6 +96,35 @@ export class IntRange {
     }
   }
 
+  public static isStaticOutcome(
+    leftRange: IntRange,
+    rightRange: IntRange,
+    operator: ComparisonOp
+  ): { isAlwaysTrue: boolean; isAlwaysFalse: boolean } {
+    switch (operator) {
+      case "<":
+        return {
+          isAlwaysTrue: leftRange.upper < rightRange.lower,
+          isAlwaysFalse: leftRange.lower >= rightRange.upper,
+        };
+      case "<=":
+        return {
+          isAlwaysTrue: leftRange.upper <= rightRange.lower,
+          isAlwaysFalse: leftRange.lower > rightRange.upper,
+        };
+      case ">":
+        return {
+          isAlwaysTrue: leftRange.lower > rightRange.upper,
+          isAlwaysFalse: leftRange.upper <= rightRange.lower,
+        };
+      case ">=":
+        return {
+          isAlwaysTrue: leftRange.lower >= rightRange.upper,
+          isAlwaysFalse: leftRange.upper < rightRange.lower,
+        };
+    }
+  }
+
   public plus(other: IntRange): IntRange {
     return new IntRange(this.lower + other.lower, this.upper + other.upper);
   }
@@ -137,6 +168,10 @@ export class IntRange {
     return "int";
   }
 }
+
+export const isComparisonOp = (o: BinExpr["operator"]): o is ComparisonOp => {
+  return o === "<" || o === "<=" || o === ">" || o === ">=";
+};
 
 export const getClassDetails = (agent: Agent): ClassTypeDetails<AstNode> => {
   const fieldNames = new Set<string>(["automaton-state"]);
