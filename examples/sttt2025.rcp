@@ -1,0 +1,30 @@
+enum ratingEnum { h, l, norating }
+message-structure: RT: ratingEnum, ID: location, D: ratingEnum, P: location, PB: bool
+// The recursion rep X. ... {guard}X used in the paper is not supported in rcheck.
+// We add P and PB to write an equivalent (supported) specification
+
+agent Client 
+    // We add xBot to track when xPartner is _|_ (undefined/bottom)
+    local: rating: ratingEnum, xPartner: location, xBot: bool, demand: ratingEnum
+    init: xBot & xPartner = myself & rating = norating
+    repeat: 
+        get1: {rating != h & rating != RT & PB} GET@(true)(ID := myself, D := demand)[rating := RT, xPartner := P, xBot := PB]
+        +
+        (
+            get2: {xBot & rating != h & rating != RT & !PB} GET@(true)(ID := myself, D := demand)[rating := RT, xPartner := P, xBot := PB];
+            get3: {true} GET@(xPartner)()[xBot := true]
+        )
+
+agent Server
+    local: partner: location, pBot: bool, demand: ratingEnum, rating: ratingEnum
+    init: pBot & demand = norating
+    repeat:
+        supply1: {pBot} SUPPLY@(any)(RT := rating, P := myself, PB := false)[partner := ID, pBot := false, demand := D]
+        +
+        supply2: {!pBot & demand != D & demand != l} SUPPLY@(any)(RT := rating, P := myself, PB := false)[partner := ID, pBot := false, demand := D]
+        +
+        supply3: {true} SUPPLY@(myself)()[demand := norating, pBot := true]
+
+system = Client(c1, demand=h) || Server (s1, rating=h)
+
+SPEC X X X (false)
