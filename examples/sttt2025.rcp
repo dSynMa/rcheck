@@ -26,5 +26,3 @@ agent Server
         supply3: {true} SUPPLY@(myself)()[demand := norating, pBot := true]
 
 system = Client(c1, demand=h) || Server (s1, rating=h)
-
-SPEC X X X (false)
