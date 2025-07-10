@@ -1,5 +1,10 @@
 enum ratingEnum { h, l, norating }
-message-structure: RT: ratingEnum, ID: location, D: ratingEnum, P: location, PB: bool
+// We need to duplicate some message variables into server (S) and client (C) variables
+message-structure:
+    SRT: ratingEnum, CRT: ratingEnum, SD: ratingEnum, CD: ratingEnum,
+    SID: location, CID: location,
+    SP: location, SPB: bool,
+    CP: location, CPB: bool
 // The recursion rep X. ... {guard}X used in the paper is not supported in rcheck.
 // We add P and PB to write an equivalent (supported) specification
 
@@ -8,10 +13,10 @@ agent Client
     local: rating: ratingEnum, xPartner: location, xBot: bool, demand: ratingEnum
     init: xBot & xPartner = myself & rating = norating
     repeat: 
-        get1: {rating != h & rating != RT & PB} GET@(true)(ID := myself, D := demand)[rating := RT, xPartner := P, xBot := PB]
+        get1: {rating != h & rating != SRT & SPB} GET@(true)(CID := myself, CD := demand)[rating := SRT, xPartner := SP, xBot := SPB]
         +
         (
-            get2: {xBot & rating != h & rating != RT & !PB} GET@(true)(ID := myself, D := demand)[rating := RT, xPartner := P, xBot := PB];
+            get2: {xBot & rating != h & rating != SRT & !SPB} GET@(true)(CID := myself, CD := demand)[rating := SRT, xPartner := SP, xBot := SPB];
             get3: {true} GET@(xPartner)()[xBot := true]
         )
 
@@ -19,10 +24,15 @@ agent Server
     local: partner: location, pBot: bool, demand: ratingEnum, rating: ratingEnum
     init: pBot & demand = norating
     repeat:
-        supply1: {pBot} SUPPLY@(any)(RT := rating, P := myself, PB := false)[partner := ID, pBot := false, demand := D]
+        supply1: {pBot} SUPPLY@(any)(SRT := rating, SP := myself, SPB := false)[partner := CID, pBot := false, demand := CD]
         +
-        supply2: {!pBot & demand != D & demand != l} SUPPLY@(any)(RT := rating, P := myself, PB := false)[partner := ID, pBot := false, demand := D]
+        supply2: {!pBot & demand != CD & demand != l} SUPPLY@(any)(SRT := rating, SP := myself, SPB := false)[partner := CID, pBot := false, demand := CD]
         +
         supply3: {true} SUPPLY@(myself)()[demand := norating, pBot := true]
 
 system = Client(c1, demand=h) || Server (s1, rating=h)
+
+
+SPEC forall k : Client . (k-xBot) -> G [[ getter == k & p2p ]] F (!k-xBot)
+SPEC forall k : Client . F G ((k-xBot -> X !k-xBot) & ((X k-xBot) -> k-xBot)) 
+SPEC forall j : Server . F G ((j-pBot -> X !j-pBot) & ((X j-pBot) -> j-pBot)) 
