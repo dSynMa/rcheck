@@ -2,7 +2,7 @@ import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium
 import { Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs, Finally,
   ForallObs, Get, Globally, Guard, GuardCall, isAgent, isAssign, isBinExpr, isBinObs, isBoolLiteral,
   isBox, isBroadcast, isCase, isChannelObs, isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs,
-  isGet, isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct, isMyself,
+  isGet, isGetterObs, isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct, isMyself,
   isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive, isRelabel, isSend, isSenderObs,
   isSupply, isUMinus, Local, MsgStruct, Neg, Next, Param, PropVar, QualifiedRef, RCheckAstType,
   Receive, Relabel, Send, Supply, SupplyLocationExpr, UMinus } from "./generated/ast.js";
@@ -20,6 +20,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isLiteralObs })
       .inferenceRule({ filter: isChannelObs })
       .inferenceRule({ filter: isSenderObs })
+      .inferenceRule({ filter: isGetterObs })
       .inferenceRule({
         languageKey: [Local, Param, MsgStruct, PropVar],
         matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "bool",
