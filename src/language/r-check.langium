@@ -144,10 +144,11 @@ Obs: CompoundObs;
 CompoundObs infers Obs:
     BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'->'|'<->') right=BaseObs)*;
 
-BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
-LiteralObs: value=('true'|'false'); 
+BaseObs : LiteralObs | ChannelObs | SenderObs | GetterObs | ForallObs | ExistsObs;
+LiteralObs: value=('true'|'false'|'p2p');
 ChannelObs: 'chan' ('=='|'='|'!=') (chan=[Case] | bcast='*');
-SenderObs: 'sender' ('=='|'='|'!=') sender=[Instance];
+SenderObs: 'sender' ('=='|'='|'!=') sender=[Qualifier];
+GetterObs: 'getter' ('=='|'='|'!=') getter=[Qualifier];
 ForallObs: operator='forall' '(' (expr=CompoundExpr) ')';
 ExistsObs: operator='exists' '(' (expr=CompoundExpr) ')';
 
