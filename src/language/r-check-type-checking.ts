@@ -181,7 +181,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: () => true,
         operands: (node: Relabel) => [node.var.ref!, node.expr],
         validation: (node, _operator, _functionType, accept, typir) =>
-          validateAssignment(node, getTypeName, accept, typir),
+          validateAssignment(node.var.ref!, node.expr, true, getTypeName, accept, typir),
         validateArgumentsOfCalls: true,
       })
       .finish();
@@ -194,7 +194,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         matching: () => true,
         operands: (node: Assign) => [node.left.ref!, node.right],
         validation: (node, _operator, _functionType, accept, typir) =>
-          validateAssignment(node, getTypeName, accept, typir),
+          validateAssignment(node.left.ref!, node.right, true, getTypeName, accept, typir),
         validateArgumentsOfCalls: true,
       })
       .finish();

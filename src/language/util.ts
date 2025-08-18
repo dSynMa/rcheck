@@ -1,9 +1,9 @@
-import { NodeFileSystem } from "langium/node";
-import { extractAstNode } from "../cli/cli-util.js";
-import { Agent, Assign, BaseProcess, BinExpr, CompoundExpr, isBinExpr, isChoice, isGet, isLocal, isMsgStruct, isNumberLiteral, isParam, isPropVar, isPropVarRef, isQualifiedRef, isReceive, isRef, isRelabel, isRep, isSend, isSequence, isSupply, isTarget, isUMinus, Local, Model, PropVar, Relabel, Sequence, Target } from "./generated/ast.js";
-import { createRCheckServices } from "./r-check-module.js";
 import { AstNode } from "langium";
-import { ClassTypeDetails, AnnotatedTypeAfterValidation, ValidationProblemAcceptor, TypirServices } from "typir";
+import { NodeFileSystem } from "langium/node";
+import { AnnotatedTypeAfterValidation, ClassTypeDetails, TypirServices, ValidationProblemAcceptor } from "typir";
+import { extractAstNode } from "../cli/cli-util.js";
+import { Agent, BaseProcess, BinExpr, CompoundExpr, isBinExpr, isChoice, isGet, isLocal, isMsgStruct, isNumberLiteral, isParam, isPropVar, isPropVarRef, isQualifiedRef, isReceive, isRef, isRep, isSend, isSequence, isSupply, isTarget, isUMinus, Local, Model, PropVar, Sequence, Target } from "./generated/ast.js";
+import { createRCheckServices } from "./r-check-module.js";
 
 export async function parseToJson(fileName: string) {
     const services = createRCheckServices(NodeFileSystem).RCheck;
@@ -265,14 +265,15 @@ export const intersectMaps = <K, V>(maps: Map<K, V>[]): Map<K, V> => {
 };
 
 export const validateAssignment = (
-  node: Relabel | Assign,
+  targetNode: Target,
+  exprNode: CompoundExpr,
+  relabel: boolean,
   getTypeName: (type: AnnotatedTypeAfterValidation) => string | undefined,
   accept: ValidationProblemAcceptor<AstNode>,
   typir: TypirServices<AstNode>
 ) => {
-  const targetNode = isRelabel(node) ? node.var.ref! : node.left.ref!;
-  const exprNode = isRelabel(node) ? node.expr : node.right;
-  const property = isRelabel(node) ? "var" : "left";
+  const node = exprNode.$container as AstNode;
+  const property = relabel ? "var" : "left";
 
   const typeInt = typir.factory.Primitives.get({ primitiveName: "int" });
   const typeRange = typir.factory.Primitives.get({ primitiveName: "range" });
@@ -280,14 +281,13 @@ export const validateAssignment = (
   const targetType = typir.Inference.inferType(targetNode);
   const exprType = typir.Inference.inferType(exprNode);
 
-  if ((targetType === typeRange && exprType === typeInt) || (targetType === typeRange && exprType === typeRange)) {
+  if (targetType === typeRange && (exprType === typeInt || exprType === typeRange)) {
     const targetRange = IntRange.fromRangeExpr(targetNode);
     const exprRange = IntRange.fromRangeExpr(exprNode);
 
     if (!targetRange.contains(exprRange)) {
       accept({
-        message: `Range variable cannot be ${
-          property === "var" ? "relabelled" : "assigned"
+        message: `Range variable cannot be ${relabel ? "relabelled" : "assigned"
         } as the range '${targetRange}' does not contain the range of the expression '${exprRange}'.`,
         languageNode: node,
         languageProperty: property,
@@ -296,10 +296,10 @@ export const validateAssignment = (
     }
   } else {
     typir.validation.Constraints.ensureNodeIsAssignable(exprNode, targetNode, accept, (actual, expected) => ({
-      message: `${property === "var" ? "Variable" : "Expression"} of type '${getTypeName(
-        property === "var" ? expected : actual
+      message: `${relabel ? "Variable" : "Expression"} of type '${getTypeName(
+        relabel ? expected : actual
       )}' cannot be ${
-        property === "var" ? "relabelled with expression of type" : "assigned to variable of type"
+        relabel ? "relabelled with expression of type" : "assigned to variable of type"
       } '${getTypeName(property === "var" ? actual : expected)}'.`,
       languageNode: node,
       languageProperty: property,
