@@ -21,6 +21,7 @@
     "files": [
         "bin",
         "icons",
+        "language-configuration.json",
         "LICENSE",
         "out",
         "src",
