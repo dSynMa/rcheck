@@ -49,8 +49,8 @@
         "commander": "~11.0.0",
         "langium": "~3.4.0",
         "monaco-languageclient": "~8.1.1",
-        "typir": "~0.2.0",
-        "typir-langium": "~0.2.0",
+        "typir": "<=0.2.1",
+        "typir-langium": "<=0.2.1",
         "vscode-languageclient": "~9.0.1",
         "vscode-languageserver": "~9.0.1"
     },
