@@ -1,15 +1,21 @@
+import { assertUnreachable, AstNode } from "langium";
+import {
+  InferenceRuleNotApplicable,
+  InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand,
+  isClassType,
+  NO_PARAMETER_NAME, Type, TypirServices,
+  ValidationProblemAcceptor
+} from "typir";
 import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
-import { Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs, Finally,
+import {
+  Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs, Finally,
   ForallObs, Get, Globally, Guard, GuardCall, isAgent, isAssign, isBinExpr, isBinObs, isBoolLiteral,
   isBox, isBroadcast, isCase, isChannelObs, isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs,
   isGet, isGetterObs, isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct, isMyself,
   isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive, isRelabel, isSend, isSenderObs,
   isSupply, isUMinus, Local, MsgStruct, Neg, Next, Param, PropVar, QualifiedRef, RCheckAstType,
-  Receive, Relabel, Send, Supply, SupplyLocationExpr, UMinus } from "./generated/ast.js";
-import { assertUnreachable, AstNode } from "langium";
-import { InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand,
-  InferenceRuleNotApplicable, NO_PARAMETER_NAME, Type, TypirServices,
-  ValidationProblemAcceptor, isClassType } from "typir";
+  Receive, Relabel, Send, Supply, SupplyLocationExpr, UMinus
+} from "./generated/ast.js";
 import { getClassDetails, getTypeName, intersectMaps, IntRange, isComparisonOp, validateAssignment } from "./util.js";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
