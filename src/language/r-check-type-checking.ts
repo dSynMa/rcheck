@@ -13,7 +13,7 @@ import {
   isBox, isBroadcast, isCase, isChannelObs, isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs,
   isGet, isGetterObs, isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct, isMyself,
   isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive, isRelabel, isSend, isSenderObs,
-  isSupply, isUMinus, Local, MsgStruct, Neg, Next, Param, PropVar, QualifiedRef, RCheckAstType,
+  isSupply, isUMinus, MsgStruct, Neg, Next, Param, PropVar, QualifiedRef, RCheckAstType,
   Receive, Relabel, Send, Supply, SupplyLocationExpr, UMinus
 } from "./generated/ast.js";
 import { getClassDetails, getTypeName, intersectMaps, IntRange, isComparisonOp, validateAssignment } from "./util.js";
@@ -28,16 +28,16 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isSenderObs })
       .inferenceRule({ filter: isGetterObs })
       .inferenceRule({
-        languageKey: [Local, Param, MsgStruct, PropVar],
-        matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "bool",
+        languageKey: [Param, MsgStruct, PropVar],
+        matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "bool",
       })
       .finish();
 
     const typeInt = typir.factory.Primitives.create({ primitiveName: "int" })
       .inferenceRule({ filter: isNumberLiteral })
       .inferenceRule({
-        languageKey: [Local, Param, MsgStruct, PropVar],
-        matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "int",
+        languageKey: [Param, MsgStruct, PropVar],
+        matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "int",
       })
       .finish();
 
@@ -46,8 +46,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     })
       .inferenceRule({ filter: isRange })
       .inferenceRule({
-        languageKey: [Local, Param, MsgStruct, PropVar],
-        matching: (node: Local | Param | MsgStruct | PropVar) => node.rangeType !== undefined,
+        languageKey: [Param, MsgStruct, PropVar],
+        matching: (node: Param | MsgStruct | PropVar) => node.rangeType !== undefined,
       })
       .finish();
 
@@ -57,8 +57,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       primitiveName: "location",
     })
       .inferenceRule({
-        languageKey: [Local, Param, MsgStruct, PropVar],
-        matching: (node: Local | Param | MsgStruct | PropVar) => node.builtinType === "location",
+        languageKey: [Param, MsgStruct, PropVar],
+        matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "location",
       })
       .inferenceRule({ filter: isMyself })
       .inferenceRule({
@@ -74,8 +74,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isChannelRef })
       .inferenceRule({ filter: isBroadcast })
       .inferenceRule({
-        languageKey: [Local, Param, MsgStruct, PropVar],
-        matching: (node: Local | Param | MsgStruct | PropVar) => node.customType?.ref?.name === "channel",
+        languageKey: [Param, MsgStruct, PropVar],
+        matching: (node: Param | MsgStruct | PropVar) => node.customType?.ref?.name === "channel",
       })
       .inferenceRule({
         languageKey: Enum,
@@ -267,7 +267,15 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       Ref: (languageNode) => {
         const ref = languageNode.variable.ref;
         if (isLocal(ref)) {
-          return ref;
+          if (ref.builtinType === "bool") { return typeBool; }
+          else if (ref.builtinType === "int") { return typeInt; }
+          else if (ref.builtinType === "location") { return typeLocation; }
+          else if (ref.rangeType !== undefined) { return ref.rangeType; }
+          else if (ref.customType !== undefined) {
+            const customTypeRef = ref.customType.ref!;
+            return customTypeRef.name === "channel" ? typeChannel : customTypeRef;
+          }
+          else { return InferenceRuleNotApplicable; }
         } else if (isCase(ref)) {
           return ref.$container;
         } else if (isParam(ref)) {
@@ -566,8 +574,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       // Create new enum type
       typir.factory.Primitives.create({ primitiveName: enumName })
         .inferenceRule({
-          languageKey: [Local, Param, MsgStruct, PropVar],
-          matching: (node: Local | Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
+          languageKey: [Param, MsgStruct, PropVar],
+          matching: (node: Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
         })
         .inferenceRule({
           languageKey: Enum,
@@ -619,7 +627,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
             return qualifier?.agent.ref === languageNode;
           },
-          field: (node: QualifiedRef) => node.variable.ref!.name!,
+          field: (node: QualifiedRef) => node.variable.ref!,
         })
         .inferenceRuleForFieldAccess({
           languageKey: AutomatonState,
