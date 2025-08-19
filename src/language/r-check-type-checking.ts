@@ -1,22 +1,27 @@
 import { assertUnreachable, AstNode } from "langium";
 import {
-  InferenceRuleNotApplicable,
-  InferOperatorWithMultipleOperands, InferOperatorWithSingleOperand,
-  isClassType,
-  NO_PARAMETER_NAME, Type, TypirServices,
-  ValidationProblemAcceptor
+  InferenceRuleNotApplicable, InferOperatorWithMultipleOperands,
+  InferOperatorWithSingleOperand, isClassType, NO_PARAMETER_NAME, Type,
+  TypirServices, ValidationProblemAcceptor
 } from "typir";
-import { LangiumTypeSystemDefinition, TypirLangiumServices } from "typir-langium";
 import {
-  Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs, Finally,
-  ForallObs, Get, Globally, Guard, GuardCall, isAgent, isAssign, isBinExpr, isBinObs, isBoolLiteral,
-  isBox, isBroadcast, isCase, isChannelObs, isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs,
-  isGet, isGetterObs, isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct, isMyself,
-  isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive, isRelabel, isSend, isSenderObs,
-  isSupply, isUMinus, MsgStruct, Neg, Next, Param, PropVar, QualifiedRef, RCheckAstType,
-  Receive, Relabel, Send, Supply, SupplyLocationExpr, UMinus
+  LangiumTypeSystemDefinition, TypirLangiumServices
+} from "typir-langium";
+import {
+  Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs,
+  Finally, ForallObs, Get, Globally, Guard, GuardCall, isAgent, isAssign,
+  isBinExpr, isBinObs, isBoolLiteral, isBox, isBroadcast, isCase, isChannelObs,
+  isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs, isGet, isGetterObs,
+  isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct,
+  isMyself, isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive,
+  isRelabel, isSend, isSenderObs, isSupply, isUMinus, MsgStruct, Neg, Next, Param,
+  PropVar, QualifiedRef, RCheckAstType, Receive, Relabel, Send, Supply,
+  SupplyLocationExpr, UMinus
 } from "./generated/ast.js";
-import { getClassDetails, getTypeName, intersectMaps, IntRange, isComparisonOp, validateAssignment } from "./util.js";
+import {
+  getClassDetails, getTypeName, intersectMaps, IntRange, isComparisonOp,
+  validateAssignment
+} from "./util.js";
 
 export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
   onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
@@ -261,21 +266,25 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         .inferenceRule(unaryInferenceRule)
         .finish();
     }
-
     // Handle variable references
     typir.Inference.addInferenceRulesForAstNodes({
+      Local: (languageNode) => {
+        if (languageNode.builtinType === "bool") { return typeBool; }
+        else if (languageNode.builtinType === "int") { return typeInt; }
+        else if (languageNode.builtinType === "location") { return typeLocation; }
+        else if (languageNode.rangeType !== undefined) { return languageNode.rangeType; }
+        else if (languageNode.customType !== undefined) {
+          const refText = languageNode.customType.$refText;
+          if (refText === "channel") { return typeChannel; }
+          const lookup = typir.factory.Primitives.get({ primitiveName: refText });
+          return lookup !== undefined ? lookup : InferenceRuleNotApplicable;
+        }
+        return InferenceRuleNotApplicable;
+      },
       Ref: (languageNode) => {
         const ref = languageNode.variable.ref;
         if (isLocal(ref)) {
-          if (ref.builtinType === "bool") { return typeBool; }
-          else if (ref.builtinType === "int") { return typeInt; }
-          else if (ref.builtinType === "location") { return typeLocation; }
-          else if (ref.rangeType !== undefined) { return ref.rangeType; }
-          else if (ref.customType !== undefined) {
-            const customTypeRef = ref.customType.ref!;
-            return customTypeRef.name === "channel" ? typeChannel : customTypeRef;
-          }
-          else { return InferenceRuleNotApplicable; }
+          return ref;
         } else if (isCase(ref)) {
           return ref.$container;
         } else if (isParam(ref)) {
