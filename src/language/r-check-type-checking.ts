@@ -276,7 +276,9 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         else if (languageNode.customType !== undefined) {
           const refText = languageNode.customType.$refText;
           if (refText === "channel") { return typeChannel; }
-          const lookup = typir.factory.Primitives.get({ primitiveName: refText });
+          const documentUri = languageNode.$container.$container.$document?.uri;
+          const enumName = `${documentUri}::${refText}`;
+          const lookup = typir.factory.Primitives.get({ primitiveName: enumName });
           return lookup !== undefined ? lookup : InferenceRuleNotApplicable;
         }
         return InferenceRuleNotApplicable;
