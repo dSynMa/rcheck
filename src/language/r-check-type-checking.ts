@@ -574,7 +574,6 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     if (isEnum(languageNode)) {
       // Exclude channel enum here
       if (languageNode.name === "channel") return;
-
       // The container of Enum node is always the root node
       const documentUri = languageNode.$container.$document!.uri;
       const enumName = `${documentUri}::${languageNode.name}`;
