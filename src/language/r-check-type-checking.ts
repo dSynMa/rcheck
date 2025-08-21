@@ -32,6 +32,10 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isChannelObs })
       .inferenceRule({ filter: isSenderObs })
       .inferenceRule({ filter: isGetterObs })
+      .inferenceRule({ filter: isGet })
+      .inferenceRule({ filter: isSupply })
+      .inferenceRule({ filter: isSend })
+      .inferenceRule({ filter: isReceive })
       .inferenceRule({
         languageKey: [Param, MsgStruct, PropVar],
         matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "bool",
