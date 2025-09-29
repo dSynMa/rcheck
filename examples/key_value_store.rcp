@@ -1,0 +1,313 @@
+// -----------------------------------------------------------------------------
+// KeyValueStore — R-CHECK translation
+// Source (TLA+): https://github.com/tlaplus/Examples/tree/master/specifications/KeyValueStore
+//
+// What it models
+//   • Two transactions (tx1, tx2) interacting with a single store over channel ch.
+//   • Commands: open, rollback, close, ack. Each close may carry per-key write (W*) and
+//     miss (M*) flags and snapshot values for three keys (K1..K3).
+//   • A simple request/ack protocol: in TLA+ actions are atomic, but in R-CHECK we must
+//     model the communication explicitly (send + ack).
+//
+// Agents & channels
+//   • Store: keeps committed values s_k1..s_k3; replies with acks and applies updates.
+//   • Transaction: keeps local snapshot (snap_k*), write flags (w_k*), miss flags (m_k*),
+//     and an active bit; uses local “*” broadcasts only to label internal updates.
+//   • ch is a multicast channel (send blocks until connected receivers can step).
+//
+// Protocol sketch
+//   • open  → ack: activates the tx and returns current store snapshot.
+//   • rollback → ack: deactivates the tx and clears local state.
+//   • close → ack: if any (W*&M*) then reject (no store change);
+//                  else apply written keys (W* & !M*) and leave others unchanged.
+// -----------------------------------------------------------------------------
+
+enum channel { ch }
+enum cmd { open, rollback, close, ack }
+enum key { k1, k2, k3 }
+enum val { NoVal, v1, v2, v3 }
+
+message-structure:
+  CMD: cmd,
+  TID: int,
+  K1: val,
+  K2: val,
+  K3: val,
+  W1: bool,
+  W2: bool,
+  W3: bool,
+  M1: bool,
+  M2: bool,
+  M3: bool
+
+agent Store
+  local:
+    src: int,
+    s_k1: val,
+    s_k2: val,
+    s_k3: val
+  init: s_k1 == NoVal & s_k2 == NoVal & s_k3 == NoVal
+  receive-guard: chan == ch
+  repeat:
+  (
+    // ---------- Open ----------
+    (
+      rOpenReq: {CMD == open} ch? [src := TID];
+        sOpenAck: {true} ch! (true)(CMD := ack, TID := src, K1 := s_k1, K2 := s_k2, K3 := s_k3)[]
+    )
+    // ---------- Rollback ----------
+    +
+    (
+      rRollbackReq: {CMD == rollback} ch? [src := TID];
+        sRollbackAck: {true} ch! (true)(CMD := ack, TID := src)[]
+    )
+    // ---------- Close ----------
+    +
+    (
+      (
+        {CMD == close & ((W1 & M1) | (W2 & M2) | (W3 & M3))} ch? [src := TID]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & W1 & !W2 & !W3} ch? [src := TID, s_k1 := K1]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & !W1 & W2 & !W3} ch? [src := TID, s_k2 := K2]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & !W1 & !W2 & W3} ch? [src := TID, s_k3 := K3]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & W1 & W2 & !W3} ch? [src := TID, s_k1 := K1, s_k2 := K2]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & W1 & !W2 & W3} ch? [src := TID, s_k1 := K1, s_k3 := K3]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & !W1 & W2 & W3} ch? [src := TID, s_k2 := K2, s_k3 := K3]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & W1 & W2 & W3} ch? [src := TID, s_k1 := K1, s_k2 := K2, s_k3 := K3]
+        +
+        {CMD == close & !((W1 & M1) | (W2 & M2) | (W3 & M3)) & !W1 & !W2 & !W3} ch? [src := TID]
+      );
+      sCloseAck: {true} ch! (true)(CMD := ack, TID := src)[]
+    )
+  )
+
+agent Transaction
+  local:
+    id: int,
+    active: bool,
+    snap_k1: val,
+    snap_k2: val,
+    snap_k3: val,
+    w_k1: bool,
+    m_k1: bool,
+    w_k2: bool,
+    m_k2: bool,
+    w_k3: bool,
+    m_k3: bool
+  init: !active & !w_k1 & !m_k1 & !w_k2 & !m_k2 & !w_k3 & !m_k3
+  receive-guard: chan == ch
+  repeat:
+  (
+    // ---------- Open ----------
+    (
+      sOpenReq: {!active} ch! (true)(CMD := open, TID := id)[];
+        rOpenAck: {CMD == ack & TID == id} ch? [active := true, snap_k1 := K1, snap_k2 := K2, snap_k3 := K3]
+      +
+      rOtherOpenReq: {CMD == open & TID != id} ch? [];
+        rOtherOpenAck: {CMD == ack & TID != id} ch? []
+    )
+    // ---------- Local operations (internal, nobody receives) ----------
+    +
+    (
+    snapUpdates_k1: {active} *! (false)()[];
+      (
+        sAdd_k1_v1: {active & snap_k1 == NoVal} *!(false)()[snap_k1 := v1, w_k1 := true]
+        +
+        sAdd_k1_v2: {active & snap_k1 == NoVal} *!(false)()[snap_k1 := v2, w_k1 := true]
+        +
+        sAdd_k1_v3: {active & snap_k1 == NoVal} *!(false)()[snap_k1 := v3, w_k1 := true]
+        +
+        sUpdate_k1_v1_to_v2: {active & snap_k1 == v1} *!(false)()[snap_k1 := v2, w_k1 := true]
+        +
+        sUpdate_k1_v1_to_v3: {active & snap_k1 == v1} *!(false)()[snap_k1 := v3, w_k1 := true]
+        +
+        sUpdate_k1_v2_to_v1: {active & snap_k1 == v2} *!(false)()[snap_k1 := v1, w_k1 := true]
+        +
+        sUpdate_k1_v2_to_v3: {active & snap_k1 == v2} *!(false)()[snap_k1 := v3, w_k1 := true]
+        +
+        sUpdate_k1_v3_to_v1: {active & snap_k1 == v3} *!(false)()[snap_k1 := v1, w_k1 := true]
+        +
+        sUpdate_k1_v3_to_v2: {active & snap_k1 == v3} *!(false)()[snap_k1 := v2, w_k1 := true]
+        +
+        sRemove_k1: {active & snap_k1 != NoVal} *!(false)()[snap_k1 := NoVal, w_k1 := true]
+      )
+    )
+    +
+    (
+    snapUpdates_k2: {active} *! (false)()[];
+      (
+        sAdd_k2_v1: {active & snap_k2 == NoVal} *!(false)()[snap_k2 := v1, w_k2 := true]
+        +
+        sAdd_k2_v2: {active & snap_k2 == NoVal} *!(false)()[snap_k2 := v2, w_k2 := true]
+        +
+        sAdd_k2_v3: {active & snap_k2 == NoVal} *!(false)()[snap_k2 := v3, w_k2 := true]
+        +
+        sUpdate_k2_v1_to_v2: {active & snap_k2 == v1} *!(false)()[snap_k2 := v2, w_k2 := true]
+        +
+        sUpdate_k2_v1_to_v3: {active & snap_k2 == v1} *!(false)()[snap_k2 := v3, w_k2 := true]
+        +
+        sUpdate_k2_v2_to_v1: {active & snap_k2 == v2} *!(false)()[snap_k2 := v1, w_k2 := true]
+        +
+        sUpdate_k2_v2_to_v3: {active & snap_k2 == v2} *!(false)()[snap_k2 := v3, w_k2 := true]
+        +
+        sUpdate_k2_v3_to_v1: {active & snap_k2 == v3} *!(false)()[snap_k2 := v1, w_k2 := true]
+        +
+        sUpdate_k2_v3_to_v2: {active & snap_k2 == v3} *!(false)()[snap_k2 := v2, w_k2 := true]
+        +
+        sRemove_k2: {active & snap_k2 != NoVal} *!(false)()[snap_k2 := NoVal, w_k2 := true]
+      )
+    )
+    +
+    (
+    snapUpdates_k3: {active} *! (false)()[];
+      (
+        sAdd_k3_v1: {active & snap_k3 == NoVal} *!(false)()[snap_k3 := v1, w_k3 := true]
+        +
+        sAdd_k3_v2: {active & snap_k3 == NoVal} *!(false)()[snap_k3 := v2, w_k3 := true]
+        +
+        sAdd_k3_v3: {active & snap_k3 == NoVal} *!(false)()[snap_k3 := v3, w_k3 := true]
+        +
+        sUpdate_k3_v1_to_v2: {active & snap_k3 == v1} *!(false)()[snap_k3 := v2, w_k3 := true]
+        +
+        sUpdate_k3_v1_to_v3: {active & snap_k3 == v1} *!(false)()[snap_k3 := v3, w_k3 := true]
+        +
+        sUpdate_k3_v2_to_v1: {active & snap_k3 == v2} *!(false)()[snap_k3 := v1, w_k3 := true]
+        +
+        sUpdate_k3_v2_to_v3: {active & snap_k3 == v2} *!(false)()[snap_k3 := v3, w_k3 := true]
+        +
+        sUpdate_k3_v3_to_v1: {active & snap_k3 == v3} *!(false)()[snap_k3 := v1, w_k3 := true]
+        +
+        sUpdate_k3_v3_to_v2: {active & snap_k3 == v3} *!(false)()[snap_k3 := v2, w_k3 := true]
+        +
+        sRemove_k3: {active & snap_k3 != NoVal} *!(false)()[snap_k3 := NoVal, w_k3 := true]
+      )
+    )
+    // ---------- Rollback ----------
+    +
+    (
+      sRollbackReq: {active} ch! (true)(CMD := rollback, TID := id)[];
+        rRollbackAck: {CMD == ack & TID == id} ch? [active := false, snap_k1 := NoVal, snap_k2 := NoVal, snap_k3 := NoVal, w_k1 := false, m_k1 := false, w_k2 := false, m_k2 := false, w_k3 := false, m_k3 := false]
+      +
+      rOtherRollbackReq: {CMD == rollback & TID != id} ch? [];
+        rOtherRollbackAck: {CMD == ack & TID != id} ch? []
+    )
+    // ---------- Close ----------
+    +
+    (
+      sCloseReq: {active} ch! (true)(CMD := close, TID := id, K1 := snap_k1, K2 := snap_k2, K3 := snap_k3, W1 := w_k1, W2 := w_k2, W3 := w_k3, M1 := m_k1, M2 := m_k2, M3 := m_k3)[];
+        rCloseAck: {CMD == ack & TID == id} ch? [active := false, snap_k1 := NoVal, snap_k2 := NoVal, snap_k3 := NoVal, w_k1 := false, m_k1 := false, w_k2 := false, m_k2 := false, w_k3 := false, m_k3 := false]
+      +
+      rOtherCloseReq: {CMD == close & TID != id} ch? [m_k1 := active & (m_k1 | W1), m_k2 := active & (m_k2 | W2), m_k3 := active & (m_k3 | W3)];
+        rOtherCloseAck: {CMD == ack & TID != id} ch? []
+    )
+  )
+
+system = Transaction(tx1, id == 1) || Transaction(tx2, id == 2) || Store(store, true)
+
+// tx open -> will be acked and tx becomes active
+// how to break: set active:=false in rOpenAck
+// tx1
+SPEC G tx1-sOpenReq -> ((X (store-rOpenReq & store-sOpenAck)) & (X X (tx1-rOpenAck & tx1-active)))
+// tx2
+SPEC G tx2-sOpenReq -> ((X (store-rOpenReq & store-sOpenAck)) & (X X (tx2-rOpenAck & tx2-active)))
+
+// tx close -> will be acked and tx becomes inactive
+// how to break: remove active:=false from rCloseAck
+// tx1
+SPEC G tx1-sCloseReq -> ((X store-sCloseAck) & (X X (tx1-rCloseAck & !tx1-active)))
+// tx2
+SPEC G tx2-sCloseReq -> ((X store-sCloseAck) & (X X (tx2-rCloseAck & !tx2-active)))
+
+// tx active -> finally one of the defined actions will be executed
+// how to break: remove one or more of the (F ...) clauses
+// tx1
+SPEC G tx1-active -> (F tx1-sRollbackReq | F tx1-sCloseReq | F tx1-rOtherOpenReq | F tx1-rOtherRollbackReq | F tx1-rOtherCloseReq | F tx1-snapUpdates_k1 | F tx2-snapUpdates_k1 | F tx1-snapUpdates_k2 | F tx2-snapUpdates_k2 | F tx1-snapUpdates_k3 | F tx2-snapUpdates_k3)
+// tx2
+SPEC G tx2-active -> (F tx2-sRollbackReq | F tx2-sCloseReq | F tx2-rOtherOpenReq | F tx2-rOtherRollbackReq | F tx2-rOtherCloseReq | F tx1-snapUpdates_k1 | F tx2-snapUpdates_k1 | F tx1-snapUpdates_k2 | F tx2-snapUpdates_k2 | F tx1-snapUpdates_k3 | F tx2-snapUpdates_k3)
+
+// tx active and does a snapshot change -> after change snapshot != store
+// how to break: remove tx*-snap assignment in the snapUpdates_k*
+// tx1
+SPEC G (tx1-active & !tx2-active & tx1-snapUpdates_k1 & tx1-snap_k1 == store-s_k1) -> (X X (tx1-snap_k1 != store-s_k1)) &
+        (tx1-active & !tx2-active & tx1-snapUpdates_k2 & tx1-snap_k2 == store-s_k2) -> (X X (tx1-snap_k2 != store-s_k2)) &
+        (tx1-active & !tx2-active & tx1-snapUpdates_k3 & tx1-snap_k3 == store-s_k3) -> (X X (tx1-snap_k3 != store-s_k3))
+// tx2
+SPEC G (!tx1-active & tx2-active & tx2-snapUpdates_k1 & tx2-snap_k1 == store-s_k1) -> (X X (tx2-snap_k1 != store-s_k1)) &
+        (!tx1-active & tx2-active & tx2-snapUpdates_k2 & tx2-snap_k2 == store-s_k2) -> (X X (tx2-snap_k2 != store-s_k2)) &
+        (!tx1-active & tx2-active & tx2-snapUpdates_k3 & tx2-snap_k3 == store-s_k3) -> (X X (tx2-snap_k3 != store-s_k3))
+
+// close with a changed snapshot and no misses -> store will be updated
+// how to break: set W*:=false in the sCloseReq
+// tx1
+SPEC G (((tx1-sCloseReq & tx1-w_k1 & !tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3 & tx1-snap_k1 != store-s_k1) -> ((X X tx1-rCloseAck) & ((tx1-snap_k1 == NoVal) -> (X store-s_k1 == NoVal)) & ((tx1-snap_k1 == v1) -> (X store-s_k1 == v1)) & ((tx1-snap_k1 == v2) -> (X store-s_k1 == v2)) & ((tx1-snap_k1 == v3) -> (X store-s_k1 == v3)))) &
+        ((tx1-sCloseReq & tx1-w_k2 & !tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3 & tx1-snap_k2 != store-s_k2) -> ((X X tx1-rCloseAck) & ((tx1-snap_k2 == NoVal) -> (X store-s_k2 == NoVal)) & ((tx1-snap_k2 == v1) -> (X store-s_k2 == v1)) & ((tx1-snap_k2 == v2) -> (X store-s_k2 == v2)) & ((tx1-snap_k2 == v3) -> (X store-s_k2 == v3)))) &
+        ((tx1-sCloseReq & tx1-w_k3 & !tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3 & tx1-snap_k3 != store-s_k3) -> ((X X tx1-rCloseAck) & ((tx1-snap_k3 == NoVal) -> (X store-s_k3 == NoVal)) & ((tx1-snap_k3 == v1) -> (X store-s_k3 == v1)) & ((tx1-snap_k3 == v2) -> (X store-s_k3 == v2)) & ((tx1-snap_k3 == v3) -> (X store-s_k3 == v3)))))
+// tx2
+SPEC G (((tx2-sCloseReq & tx2-w_k1 & !tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3 & tx2-snap_k1 != store-s_k1) -> ((X X tx2-rCloseAck) & ((tx2-snap_k1 == NoVal) -> (X store-s_k1 == NoVal)) & ((tx2-snap_k1 == v1) -> (X store-s_k1 == v1)) & ((tx2-snap_k1 == v2) -> (X store-s_k1 == v2)) & ((tx2-snap_k1 == v3) -> (X store-s_k1 == v3)))) &
+        ((tx2-sCloseReq & tx2-w_k2 & !tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3 & tx2-snap_k2 != store-s_k2) -> ((X X tx2-rCloseAck) & ((tx2-snap_k2 == NoVal) -> (X store-s_k2 == NoVal)) & ((tx2-snap_k2 == v1) -> (X store-s_k2 == v1)) & ((tx2-snap_k2 == v2) -> (X store-s_k2 == v2)) & ((tx2-snap_k2 == v3) -> (X store-s_k2 == v3)))) &
+        ((tx2-sCloseReq & tx2-w_k3 & !tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3 & tx2-snap_k3 != store-s_k3) -> ((X X tx2-rCloseAck) & ((tx2-snap_k3 == NoVal) -> (X store-s_k3 == NoVal)) & ((tx2-snap_k3 == v1) -> (X store-s_k3 == v1)) & ((tx2-snap_k3 == v2) -> (X store-s_k3 == v2)) & ((tx2-snap_k3 == v3) -> (X store-s_k3 == v3)))))
+
+// snapshot != to store -> missed flag must be set
+// how to break: remove missed flags assignment in rOtherCloseReq
+// tx1
+SPEC G ((tx1-active & tx1-snap_k1 != store-s_k1 & !tx1-w_k1) -> tx1-m_k1) &
+        ((tx1-active & tx1-snap_k2 != store-s_k2 & !tx1-w_k2) -> tx1-m_k2) &
+        ((tx1-active & tx1-snap_k3 != store-s_k3 & !tx1-w_k3) -> tx1-m_k3)
+// tx2
+SPEC G ((tx2-active & tx2-snap_k1 != store-s_k1 & !tx2-w_k1) -> tx2-m_k1) &
+        ((tx2-active & tx2-snap_k2 != store-s_k2 & !tx2-w_k2) -> tx2-m_k2) &
+        ((tx2-active & tx2-snap_k3 != store-s_k3 & !tx2-w_k3) -> tx2-m_k3)
+
+// tx inactive and sees other close request -> don't update missed flags
+// how to break: remove 'active &' part of flag updates in rOtherCloseReq
+// tx1
+SPEC G (tx1-rOtherCloseReq & !tx1-active) -> (!tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3)
+// tx2
+SPEC G (tx2-rOtherCloseReq & !tx2-active) -> (!tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3)
+
+// tx active and sees other close request with write flags -> update missed flags
+// how to break: remove '| W*' part of flag updates in rOtherCloseReq
+// tx1
+SPEC G ((tx1-rOtherCloseReq & tx1-active & tx2-w_k1) -> (tx1-m_k1)) &
+        ((tx1-rOtherCloseReq & tx1-active & tx2-w_k2) -> (tx1-m_k2)) &
+        ((tx1-rOtherCloseReq & tx1-active & tx2-w_k3) -> (tx1-m_k3))
+// tx2
+SPEC G ((tx2-rOtherCloseReq & tx2-active & tx1-w_k1) -> (tx2-m_k1)) &
+        ((tx2-rOtherCloseReq & tx2-active & tx1-w_k2) -> (tx2-m_k2)) &
+        ((tx2-rOtherCloseReq & tx2-active & tx1-w_k3) -> (tx2-m_k3))
+
+// conflicts upon closure -> updates are rejected
+// how to break: set at least one M*:=false in sCloseReq
+// tx1, k1
+SPEC G (tx1-sCloseReq & ((tx1-w_k1 & tx1-m_k1) | (tx1-w_k2 & tx1-m_k2) | (tx1-w_k3 & tx1-m_k3))) -> ((store-s_k1 == NoVal -> X store-s_k1 == NoVal) & (store-s_k1 == v1 -> X store-s_k1 == v1) & (store-s_k1 == v2 -> X store-s_k1 == v2) & (store-s_k1 == v3 -> X store-s_k1 == v3))
+// tx1, k2
+SPEC G (tx1-sCloseReq & ((tx1-w_k1 & tx1-m_k1) | (tx1-w_k2 & tx1-m_k2) | (tx1-w_k3 & tx1-m_k3))) -> ((store-s_k2 == NoVal -> X store-s_k2 == NoVal) & (store-s_k2 == v1 -> X store-s_k2 == v1) & (store-s_k2 == v2 -> X store-s_k2 == v2) & (store-s_k2 == v3 -> X store-s_k2 == v3))
+// tx1, k3
+SPEC G (tx1-sCloseReq & ((tx1-w_k1 & tx1-m_k1) | (tx1-w_k2 & tx1-m_k2) | (tx1-w_k3 & tx1-m_k3))) -> ((store-s_k3 == NoVal -> X store-s_k3 == NoVal) & (store-s_k3 == v1 -> X store-s_k3 == v1) & (store-s_k3 == v2 -> X store-s_k3 == v2) & (store-s_k3 == v3 -> X store-s_k3 == v3))
+// tx2, k1
+SPEC G (tx2-sCloseReq & ((tx2-w_k1 & tx2-m_k1) | (tx2-w_k2 & tx2-m_k2) | (tx2-w_k3 & tx2-m_k3))) -> ((store-s_k1 == NoVal -> X store-s_k1 == NoVal) & (store-s_k1 == v1 -> X store-s_k1 == v1) & (store-s_k1 == v2 -> X store-s_k1 == v2) & (store-s_k1 == v3 -> X store-s_k1 == v3))
+// tx2, k2
+SPEC G (tx2-sCloseReq & ((tx2-w_k1 & tx2-m_k1) | (tx2-w_k2 & tx2-m_k2) | (tx2-w_k3 & tx2-m_k3))) -> ((store-s_k2 == NoVal -> X store-s_k2 == NoVal) & (store-s_k2 == v1 -> X store-s_k2 == v1) & (store-s_k2 == v2 -> X store-s_k2 == v2) & (store-s_k2 == v3 -> X store-s_k2 == v3))
+// tx2, k3
+SPEC G (tx2-sCloseReq & ((tx2-w_k1 & tx2-m_k1) | (tx2-w_k2 & tx2-m_k2) | (tx2-w_k3 & tx2-m_k3))) -> ((store-s_k3 == NoVal -> X store-s_k3 == NoVal) & (store-s_k3 == v1 -> X store-s_k3 == v1) & (store-s_k3 == v2 -> X store-s_k3 == v2) & (store-s_k3 == v3 -> X store-s_k3 == v3))
+
+// no writes and no misses -> no changes
+// how to break: set at least one s_k* to any value in rejecting branch upon receiving close request in the store
+// tx1, k1
+SPEC G (tx1-sCloseReq & !tx1-w_k1 & !tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3) -> ((store-s_k1 == NoVal -> X store-s_k1 == NoVal) & (store-s_k1 == v1 -> X store-s_k1 == v1) & (store-s_k1 == v2 -> X store-s_k1 == v2) & (store-s_k1 == v3 -> X store-s_k1 == v3))
+// tx1, k2
+SPEC G (tx1-sCloseReq & !tx1-w_k2 & !tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3) -> ((store-s_k2 == NoVal -> X store-s_k2 == NoVal) & (store-s_k2 == v1 -> X store-s_k2 == v1) & (store-s_k2 == v2 -> X store-s_k2 == v2) & (store-s_k2 == v3 -> X store-s_k2 == v3))
+// tx1, k3
+SPEC G (tx1-sCloseReq & !tx1-w_k3 & !tx1-m_k1 & !tx1-m_k2 & !tx1-m_k3) -> ((store-s_k3 == NoVal -> X store-s_k3 == NoVal) & (store-s_k3 == v1 -> X store-s_k3 == v1) & (store-s_k3 == v2 -> X store-s_k3 == v2) & (store-s_k3 == v3 -> X store-s_k3 == v3))
+// tx2, k1
+SPEC G (tx2-sCloseReq & !tx2-w_k1 & !tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3) -> ((store-s_k1 == NoVal -> X store-s_k1 == NoVal) & (store-s_k1 == v1 -> X store-s_k1 == v1) & (store-s_k1 == v2 -> X store-s_k1 == v2) & (store-s_k1 == v3 -> X store-s_k1 == v3))
+// tx2, k2
+SPEC G (tx2-sCloseReq & !tx2-w_k2 & !tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3) -> ((store-s_k2 == NoVal -> X store-s_k2 == NoVal) & (store-s_k2 == v1 -> X store-s_k2 == v1) & (store-s_k2 == v2 -> X store-s_k2 == v2) & (store-s_k2 == v3 -> X store-s_k2 == v3))
+// tx2, k3
+SPEC G (tx2-sCloseReq & !tx2-w_k3 & !tx2-m_k1 & !tx2-m_k2 & !tx2-m_k3) -> ((store-s_k3 == NoVal -> X store-s_k3 == NoVal) & (store-s_k3 == v1 -> X store-s_k3 == v1) & (store-s_k3 == v2 -> X store-s_k3 == v2) & (store-s_k3 == v3 -> X store-s_k3 == v3))

@@ -50,8 +50,8 @@ Rep:
     'rep' process=Choice;
 
 fragment CmdHeader: (name=ID ':')? '{' psi=CompoundExpr '}';
-fragment Update: '[' (update+=Assign (',' update+=Assign)*)? ']';
-fragment Data: '(' (data+=Assign (',' data+=Assign)*)? ')';
+fragment Update: '[' (update+=UpdateAssign (',' update+=UpdateAssign)*)? ']';
+fragment Data: '(' (data+=MessageAssign (',' data+=MessageAssign)*)? ')';
 
 Send:
     CmdHeader chanExpr=ChannelExpr '!' sendGuard=CompoundExpr Data Update;
@@ -65,7 +65,9 @@ Supply:
 type Command = Send | Receive | Get | Supply;
 type Process = BaseProcess | Rep | Sequence | Choice;
 
-Assign: left=[Target] ':=' right=CompoundExpr;
+Assign: MessageAssign | UpdateAssign ;
+MessageAssign: left=[MsgStruct] ':=' right=CompoundExpr;
+UpdateAssign: left=[Local] ':=' right=CompoundExpr;
 
 ChannelExprRef: Case | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
@@ -76,6 +78,7 @@ GetLocationExpr: predicate=CompoundExpr;
 
 fragment TypedDeclaration: 
     name=ID ':' (builtinType=('bool'|'int'|'location') | customType=[Enum] | rangeType=Range);
+    // name=ID ':' (builtinType=('bool'|'int'|'location') | customType=[Enum] | rangeType=Range | notfound=ID);
 
 
 Range: lower=INT '..' upper=INT;
@@ -144,10 +147,11 @@ Obs: CompoundObs;
 CompoundObs infers Obs:
     BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'->'|'<->') right=BaseObs)*;
 
-BaseObs : LiteralObs | ChannelObs | SenderObs | ForallObs | ExistsObs;
-LiteralObs: value=('true'|'false'); 
+BaseObs : LiteralObs | ChannelObs | SenderObs | GetterObs | ForallObs | ExistsObs;
+LiteralObs: value=('true'|'false'|'p2p');
 ChannelObs: 'chan' ('=='|'='|'!=') (chan=[Case] | bcast='*');
-SenderObs: 'sender' ('=='|'='|'!=') sender=[Instance];
+SenderObs: 'sender' ('=='|'='|'!=') sender=[Qualifier];
+GetterObs: 'getter' ('=='|'='|'!=') getter=[Qualifier];
 ForallObs: operator='forall' '(' (expr=CompoundExpr) ')';
 ExistsObs: operator='exists' '(' (expr=CompoundExpr) ')';
 
