@@ -32,6 +32,60 @@ function next() { vscode.postMessage({ command: 'next', data: select.value }); }
 function back() { vscode.postMessage({ command: 'back' }); }
 
 
+function formatTransition(t) {
+    const isSupplyGet = t.hasOwnProperty("___get-supply___");
+    const table = document.createElement("table");
+
+    const row1 = document.createElement("tr");
+    const cell1_1 = document.createElement("td");
+    const cell1_2 = document.createElement("td");
+    cell1_1.innerHTML = `<em>${isSupplyGet ? "Supplier" : "Sender"}: </em>`;
+    cell1_2.textContent = t.sender;
+    row1.appendChild(cell1_1);
+    row1.appendChild(cell1_2);
+    table.appendChild(row1);
+    const row2 = document.createElement("tr");
+    const cell2_1 = document.createElement("td");
+    const cell2_2 = document.createElement("td");
+    cell2_1.innerHTML = `<em>Command: </em>`;
+    cell2_2.textContent = t.send;
+    row2.appendChild(cell2_1);
+    row2.appendChild(cell2_2);
+    table.appendChild(row2);
+    const row3 = document.createElement("tr");
+    const cell3_1 = document.createElement("td");
+    const cell3_2 = document.createElement("td");
+    cell3_1.innerHTML = `<em>${isSupplyGet ? "Getter" : "Receivers"}: </em>`;
+    cell3_2.textContent = t.receivers.join(", ");
+    row3.appendChild(cell3_1);
+    row3.appendChild(cell3_2);
+    table.appendChild(row3);
+    return table;
+}
+
+function formatStep(step) {
+    const table = document.createElement("table");
+    const rows = Object.keys(step).sort().forEach(agent => {
+        const tr = document.createElement("tr");
+        const td1 = document.createElement("td");
+        td1.textContent = agent + ":";
+        tr.appendChild(td1);
+        const td2 = document.createElement("td");
+        const parts = [];
+        Object.keys(step[agent]).sort().map((k) => {
+            if (k === "**state**") {
+                parts.push(`<em>state</em>: ${step[agent][k]}`);
+            } else if (!k.startsWith("**")) {
+                parts.push(`${k}: ${step[agent][k]}`);
+            }
+        });
+        td2.innerHTML = parts.join(", ");
+        tr.appendChild(td2);
+        table.appendChild(tr);
+    })
+    return table;
+}
+
 window.addEventListener('message', event => {
     const message = event.data;
     switch (message.command) {
@@ -45,7 +99,8 @@ window.addEventListener('message', event => {
                 const row = document.createElement("vscode-table-row");
                 row.appendChild(document.createElement("vscode-table-cell"));
                 const cell = document.createElement("vscode-table-cell");
-                cell.textContent = JSON.stringify(message.content.inboundTransition);
+                const content = formatTransition(message.content.inboundTransition);
+                cell.appendChild(content)
                 row.appendChild(cell);
                 steps.appendChild(row);
             }
@@ -54,7 +109,8 @@ window.addEventListener('message', event => {
             const cell2 = document.createElement("vscode-table-cell");
             counter += 1;
             cell1.textContent = counter;
-            cell2.textContent = JSON.stringify(message.content.state);
+            const content = formatStep(message.content.state);
+            cell2.appendChild(content);
             row.appendChild(cell1);
             row.appendChild(cell2);
             steps.appendChild(row);
