@@ -86,7 +86,7 @@
         "commands": [
             {
                 "command": "rcheck.simulate",
-                "title": "R-CHECK: Simulate system"
+                "title": "R-CHECK: Open simulator"
             },
             {
                 "command": "rcheck.todot",
