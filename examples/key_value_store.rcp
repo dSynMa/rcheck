@@ -29,7 +29,7 @@ enum val { NoVal, v1, v2, v3 }
 
 message-structure:
   CMD: cmd,
-  TID: int,
+  TID: location,
   K1: val,
   K2: val,
   K3: val,
@@ -42,7 +42,7 @@ message-structure:
 
 agent Store
   local:
-    src: int,
+    src: location,
     s_k1: val,
     s_k2: val,
     s_k3: val
@@ -89,7 +89,6 @@ agent Store
 
 agent Transaction
   local:
-    id: int,
     active: bool,
     snap_k1: val,
     snap_k2: val,
@@ -106,11 +105,11 @@ agent Transaction
   (
     // ---------- Open ----------
     (
-      sOpenReq: {!active} ch! (true)(CMD := open, TID := id)[];
-        rOpenAck: {CMD == ack & TID == id} ch? [active := true, snap_k1 := K1, snap_k2 := K2, snap_k3 := K3]
+      sOpenReq: {!active} ch! (true)(CMD := open, TID := myself)[];
+        rOpenAck: {CMD == ack & TID == myself} ch? [active := true, snap_k1 := K1, snap_k2 := K2, snap_k3 := K3]
       +
-      rOtherOpenReq: {CMD == open & TID != id} ch? [];
-        rOtherOpenAck: {CMD == ack & TID != id} ch? []
+      rOtherOpenReq: {CMD == open & TID != myself} ch? [];
+        rOtherOpenAck: {CMD == ack & TID != myself} ch? []
     )
     // ---------- Local operations (internal, nobody receives) ----------
     +
@@ -191,24 +190,24 @@ agent Transaction
     // ---------- Rollback ----------
     +
     (
-      sRollbackReq: {active} ch! (true)(CMD := rollback, TID := id)[];
-        rRollbackAck: {CMD == ack & TID == id} ch? [active := false, snap_k1 := NoVal, snap_k2 := NoVal, snap_k3 := NoVal, w_k1 := false, m_k1 := false, w_k2 := false, m_k2 := false, w_k3 := false, m_k3 := false]
+      sRollbackReq: {active} ch! (true)(CMD := rollback, TID := myself)[];
+        rRollbackAck: {CMD == ack & TID == myself} ch? [active := false, snap_k1 := NoVal, snap_k2 := NoVal, snap_k3 := NoVal, w_k1 := false, m_k1 := false, w_k2 := false, m_k2 := false, w_k3 := false, m_k3 := false]
       +
-      rOtherRollbackReq: {CMD == rollback & TID != id} ch? [];
-        rOtherRollbackAck: {CMD == ack & TID != id} ch? []
+      rOtherRollbackReq: {CMD == rollback & TID != myself} ch? [];
+        rOtherRollbackAck: {CMD == ack & TID != myself} ch? []
     )
     // ---------- Close ----------
     +
     (
-      sCloseReq: {active} ch! (true)(CMD := close, TID := id, K1 := snap_k1, K2 := snap_k2, K3 := snap_k3, W1 := w_k1, W2 := w_k2, W3 := w_k3, M1 := m_k1, M2 := m_k2, M3 := m_k3)[];
-        rCloseAck: {CMD == ack & TID == id} ch? [active := false, snap_k1 := NoVal, snap_k2 := NoVal, snap_k3 := NoVal, w_k1 := false, m_k1 := false, w_k2 := false, m_k2 := false, w_k3 := false, m_k3 := false]
+      sCloseReq: {active} ch! (true)(CMD := close, TID := myself, K1 := snap_k1, K2 := snap_k2, K3 := snap_k3, W1 := w_k1, W2 := w_k2, W3 := w_k3, M1 := m_k1, M2 := m_k2, M3 := m_k3)[];
+        rCloseAck: {CMD == ack & TID == myself} ch? [active := false, snap_k1 := NoVal, snap_k2 := NoVal, snap_k3 := NoVal, w_k1 := false, m_k1 := false, w_k2 := false, m_k2 := false, w_k3 := false, m_k3 := false]
       +
-      rOtherCloseReq: {CMD == close & TID != id} ch? [m_k1 := active & (m_k1 | W1), m_k2 := active & (m_k2 | W2), m_k3 := active & (m_k3 | W3)];
-        rOtherCloseAck: {CMD == ack & TID != id} ch? []
+      rOtherCloseReq: {CMD == close & TID != myself} ch? [m_k1 := active & (m_k1 | W1), m_k2 := active & (m_k2 | W2), m_k3 := active & (m_k3 | W3)];
+        rOtherCloseAck: {CMD == ack & TID != myself} ch? []
     )
   )
 
-system = Transaction(tx1, id == 1) || Transaction(tx2, id == 2) || Store(store, true)
+system = Transaction(tx1, true) || Transaction(tx2, true) || Store(store, true)
 
 // tx open -> will be acked and tx becomes active
 // how to break: set active:=false in rOpenAck
