@@ -26,10 +26,13 @@ Folder `example` contains a number of sample files.
 
 The extension provides the following commands from the command palette (`Ctrl-R` or `Cmd-R` depending on the operating system):
 
-* *R-CHECK: Show agents' transition systems*: This will visualize the behaviour of each agent in the current system as a symbolic automaton. Requires either the [Graphviz Interactive Preview extension](https://marketplace.visualstudio.com/items?itemName=tintinweb.graphviz-interactive-preview) (recommended), or the [`graphviz`](https://graphviz.org/) software package.
+* *R-CHECK: Model-check using IC3*: Model-check all specifications in the current file, using an efficient IC3 procedure. Requires the [`nuxmv`](https://nuxmv.fbk.eu/) tool.
 
-* *R-CHECK: Model-check using IC3*: This will model check all specifications in the current file. Requires the [`nuxmv`](https://nuxmv.fbk.eu/) tool.
+* *R-CHECK: Open simulator*": Open an interactive simulator pane that allows to construct a trace of the system by choosing which message exchanges fire at each step.
 
+* *R-CHECK: Show agents' transition systems*: Visualize the behaviour of each agent in the current system as a symbolic automaton. Requires either the [Graphviz Interactive Preview extension](https://marketplace.visualstudio.com/items?itemName=tintinweb.graphviz-interactive-preview) (recommended), or the [`graphviz`](https://graphviz.org/) software package.
+
+* *R-CHECK: Show SMV translation*: Open a pane with the translation of the R-CHECK system into SMV, used for model-checking. Mainly useful for debugging purposes.
 
 ## Instructions — debugging
 
