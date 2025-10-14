@@ -44,8 +44,12 @@
         "test": "vitest run"
     },
     "dependencies": {
+        "@types/ejs": "^3.1.5",
+        "@vscode-elements/elements": "^2.3.1",
+        "axios": "^1.9.0",
         "chalk": "~5.6.0",
         "commander": "~11.0.0",
+        "ejs": "^3.1.10",
         "langium": "~3.5.0",
         "monaco-languageclient": "~9.11.0",
         "typir": "~0.2.2",
@@ -57,14 +61,14 @@
         "@codingame/esbuild-import-meta-url-plugin": "~1.0.2",
         "@types/node": "^24.0.0",
         "@types/vscode": "~1.94.0",
+        "@vscode/vsce": "^3.4.0",
         "concurrently": "~9.2.0",
         "esbuild": "^0.25.5",
         "http-server": "~14.1.1",
         "langium-cli": "~3.5.0",
         "typescript": "~5.9.2",
         "vite": "^7.0.0",
-        "vitest": "^3.2.0",
-        "@vscode/vsce": "^3.4.0"
+        "vitest": "^3.2.0"
     },
     "volta": {
         "node": "18.19.1",
@@ -81,30 +85,38 @@
     "contributes": {
         "commands": [
             {
+                "command": "rcheck.simulate",
+                "title": "R-CHECK: Open simulator"
+            },
+            {
                 "command": "rcheck.todot",
                 "title": "R-CHECK: Show agents as automata"
             },
             {
-                "command": "rcheck.verify",
-                "title": "R-CHECK: Model-check using IC3"
-            },
-            {
                 "command": "rcheck.tosmv",
                 "title": "R-CHECK: Show SMV translation"
+            },
+            {
+                "command": "rcheck.verify",
+                "title": "R-CHECK: Model-check using IC3"
             }
         ],
         "menus": {
             "commandPalette": [
                 {
+                    "command": "rcheck.simulate",
+                    "when": "resourceExtname == .rcp"
+                },
+                {
                     "command": "rcheck.todot",
                     "when": "resourceExtname == .rcp"
                 },
                 {
-                    "command": "rcheck.verify",
+                    "command": "rcheck.tosmv",
                     "when": "resourceExtname == .rcp"
                 },
                 {
-                    "command": "rcheck.tosmv",
+                    "command": "rcheck.verify",
                     "when": "resourceExtname == .rcp"
                 }
             ]

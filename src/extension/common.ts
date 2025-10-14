@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { execFile } from "child_process";
 import { promisify } from "node:util";
 import { PathOrFileDescriptor, readFile, writeFile } from "node:fs";
+import { spawn } from "node:child_process";
+import ejs from "ejs";
 
 let jarPath: string;
 let context: vscode.ExtensionContext;
@@ -12,7 +14,7 @@ export const writePromise = promisify(writeFile);
 
 const rp = promisify(readFile);
 export async function readPromise(x: PathOrFileDescriptor): Promise<string> {
-    return rp(x, {encoding: "utf-8"});
+    return rp(x, { encoding: "utf-8" });
 }
 export type ExecResult = {
     stdout: string,
@@ -37,4 +39,29 @@ export function getCurrentRcpFile() {
 export async function runJar(args: string[]) {
     const args_ = ["-jar", jarPath].concat(args);
     return execPromise("java", args_);
+}
+
+export function spawnJar(args: string[]) {
+    const args_ = ["-jar", jarPath].concat(args);
+    return spawn("java", args_);
+}
+
+ejs.openDelimiter = "{"
+ejs.closeDelimiter = "}"
+
+export async function renderTemplate(ctx: vscode.ExtensionContext, fname: string, data: ejs.Data, webview: vscode.Webview,) {
+    const filePath = ctx.asAbsolutePath(join("src", "extension", "html", fname));
+    const elementsUri = webview.asWebviewUri(
+        vscode.Uri.joinPath(
+            ctx.extensionUri,
+            "node_modules",
+            "@vscode-elements/elements",
+            "dist",
+            "bundled.js"
+        )
+    );
+    data["elementsUri"] = elementsUri;
+    data["cspSource"] = webview.cspSource;
+    const html = ejs.renderFile(filePath, data);
+    return html;
 }

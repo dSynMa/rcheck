@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulator: {%=fname%}</title>
+    <script type="module" src="{%= elementsUri %}"></script>
+    <style>
+        .scrollable-table {
+            height: calc(95vh - 100px);
+        }
+    </style>
+</head>
+
+<body>
+    <h1>R-CHECK simulator: {%=fname%}</h1>
+    <vscode-form-group>
+        <vscode-label for="select-transition">Transition:</vscode-label>
+        <vscode-single-select id="select-transition"></vscode-single-select>
+        <vscode-button id="button-next" onclick="next()">Next</vscode-button>
+        <vscode-button secondary onclick="back()">Back</vscode-button>
+    </vscode-form-group>
+    <vscode-divider></vscode-divider>
+    <vscode-table class="scrollable-table" zebra bordered-rows resizable columns='["10%", "90%"]' min-column-width="5px">
+        <vscode-table-header slot="header">
+            <vscode-table-header-cell id="header-cell">#</vscode-table-header-cell>
+            <vscode-table-header-cell>State</vscode-table-header-cell>
+        </vscode-table-header>
+        <vscode-table-body slot="body" id="steps"></vscode-table-body>
+    </vscode-table>
+    <vscode-divider></vscode-divider>
+<script>
+const vscode = acquireVsCodeApi();
+const select = document.getElementById("select-transition");
+const steps = document.getElementById("steps");
+const headerCell = document.getElementById("header-cell");
+const buttonNext = document.getElementById("button-next");
+let counter = 0;
+function next() { vscode.postMessage({ command: 'next', data: select.value }); }
+function back() { vscode.postMessage({ command: 'back' }); }
+
+
+function formatTransition(t) {
+    const isSupplyGet = t.hasOwnProperty("___get-supply___");
+    const table = document.createElement("table");
+
+    const row1 = document.createElement("tr");
+    const cell1_1 = document.createElement("td");
+    const cell1_2 = document.createElement("td");
+    cell1_1.innerHTML = `<em>${isSupplyGet ? "Supplier" : "Sender"}: </em>`;
+    cell1_2.textContent = t.sender;
+    row1.appendChild(cell1_1);
+    row1.appendChild(cell1_2);
+    table.appendChild(row1);
+    const row2 = document.createElement("tr");
+    const cell2_1 = document.createElement("td");
+    const cell2_2 = document.createElement("td");
+    cell2_1.innerHTML = `<em>Command: </em>`;
+    cell2_2.textContent = t.send;
+    row2.appendChild(cell2_1);
+    row2.appendChild(cell2_2);
+    table.appendChild(row2);
+    const row3 = document.createElement("tr");
+    const cell3_1 = document.createElement("td");
+    const cell3_2 = document.createElement("td");
+    cell3_1.innerHTML = `<em>${isSupplyGet ? "Getter" : "Receivers"}: </em>`;
+    cell3_2.textContent = t.receivers.join(", ");
+    row3.appendChild(cell3_1);
+    row3.appendChild(cell3_2);
+    table.appendChild(row3);
+    return table;
+}
+
+function formatStep(step) {
+    const table = document.createElement("table");
+    const rows = Object.keys(step).sort().forEach(agent => {
+        const tr = document.createElement("tr");
+        const td1 = document.createElement("td");
+        td1.textContent = agent + ":";
+        tr.appendChild(td1);
+        const td2 = document.createElement("td");
+        const parts = [];
+        Object.keys(step[agent]).sort().map((k) => {
+            if (k === "**state**") {
+                parts.push(`<em>state</em>: ${step[agent][k]}`);
+            } else if (!k.startsWith("**")) {
+                parts.push(`${k}: ${step[agent][k]}`);
+            }
+        });
+        td2.innerHTML = parts.join(", ");
+        tr.appendChild(td2);
+        table.appendChild(tr);
+    })
+    return table;
+}
+
+window.addEventListener('message', event => {
+    const message = event.data;
+    switch (message.command) {
+        case 'undo-step':
+            if (steps.firstChild) { steps.removeChild(steps.lastChild); }
+            if (steps.firstChild) { steps.removeChild(steps.lastChild); }
+            counter -= 1;
+            break;
+        case 'append-step':
+            if (message.content.hasOwnProperty("inboundTransition")) {
+                const row = document.createElement("vscode-table-row");
+                row.appendChild(document.createElement("vscode-table-cell"));
+                const cell = document.createElement("vscode-table-cell");
+                const content = formatTransition(message.content.inboundTransition);
+                cell.appendChild(content)
+                row.appendChild(cell);
+                steps.appendChild(row);
+            }
+            const row = document.createElement("vscode-table-row");
+            const cell1 = document.createElement("vscode-table-cell");
+            const cell2 = document.createElement("vscode-table-cell");
+            counter += 1;
+            cell1.textContent = counter;
+            cell1.style.width = headerCell.style.width;
+            const content = formatStep(message.content.state);
+            cell2.appendChild(content);
+            row.appendChild(cell1);
+            row.appendChild(cell2);
+            steps.appendChild(row);
+            row.scrollIntoView();
+            break;
+        case 'update-transitions':
+            while (select.firstChild) { select.removeChild(select.lastChild); }
+            if (message.content.length === 0) {
+                const option = document.createElement("vscode-option");
+                option.setAttribute("value", -1);
+                option.textContent = "No available transitions";
+                select.appendChild(option);
+                select.value = -1;
+                select.disabled = true;
+                buttonNext.disabled = true;
+                break;
+            }
+            select.disabled = false;
+            buttonNext.disabled = false;
+            for (let index = 0; index < message.content.length; index++) {
+                const element = message.content[index];
+                const option = document.createElement("vscode-option");
+                option.setAttribute("description", element.send)
+                option.setAttribute("value", index);
+                option.textContent = element.sender + '-> {' + element.receivers.join(", ") + '}';
+                select.appendChild(option);
+            }
+            break;
+    }
+});
+</script>
+</body>
+
+</html>
