@@ -21,13 +21,30 @@ export class Verify {
      */
     Init(context: vscode.ExtensionContext): void {
         context.subscriptions.push(
-            vscode.commands.registerCommand('rcheck.verify', async () => {
+            vscode.commands.registerCommand('rcheck.verify-ic3', async () => {
                 const rcpPath = getCurrentRcpFile()!;
                 const tmpJson = await temp.toJson(rcpPath);
                 check()
                 .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
                 .then(findSpecs)
-                .then(value => verifySpecs(rcpPath, tmpJson, value))
+                .then(value => verifySpecsIc3(rcpPath, tmpJson, value))
+                .catch(vscode.window.showErrorMessage)
+            }),
+            vscode.commands.registerCommand('rcheck.verify-bmc', async () => {
+                
+                const rcpPath = getCurrentRcpFile()!;
+                const tmpJson = await temp.toJson(rcpPath);
+                const boundString = await vscode.window.showInputBox({
+                    placeHolder: 'Enter BMC bound (default 20)',
+                    validateInput: text => {
+                        return text === '' || /^\d+$/.test(text) ? null : 'Please enter a valid integer';
+                    }
+                });
+                const bound = boundString === '' ? 20 : parseInt(boundString!);
+                check()
+                .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
+                .then(findSpecs)
+                .then(value => verifySpecsBmc(rcpPath, tmpJson, bound, value))
                 .catch(vscode.window.showErrorMessage)
             }),
             vscode.commands.registerCommand('rcheck.tosmv', async () => {
@@ -76,7 +93,7 @@ async function findSpecs(value: ExecResult) {
 /**
  * Launch verification tasks
  */
-async function verifySpecs(fname:string, json: string, v: [string, ExecResult]) {
+async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult]) {
     const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
     channel.show();
     channel.appendLine(`[${fname}] Model checking started...`);
@@ -97,7 +114,7 @@ async function verifySpecs(fname:string, json: string, v: [string, ExecResult]) 
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const nuxmvOutput = await ic3(v[0], index, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
-            return formatOutput(split[0], json, nuxmvOutput);
+            return formatOutputIc3(split[0], json, nuxmvOutput);
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
@@ -111,7 +128,7 @@ async function verifySpecs(fname:string, json: string, v: [string, ExecResult]) 
     panel.webview.html = html;
 }
 
-async function formatOutput(spec: string, json: string, out: string) {
+async function formatOutputIc3(spec: string, json: string, out: string) {
     const isTrue = out.indexOf("is true") > -1
     const isFalse = out.indexOf("is false") > -1
     const emoji = isTrue ? "✅" : isFalse ? "❌" : "❔"
@@ -202,6 +219,92 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
                     resolve(stdout);
                 }
             }
+        });
+        temp.addChild(fname, child);
+    });
+}
+
+/**
+ * Launch BMC verification tasks
+ */
+async function verifySpecsBmc(fname:string, json: string, bound: integer, v: [string, ExecResult]) {
+    const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
+    channel.show();
+    channel.appendLine(`[${fname}] Model checking started...`);
+    const title = `R-CHECK: Verification of ${fname}`
+    let htmlReport =  `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+</head>
+<body>
+    <h1>${title}</h1>`
+    
+    let count = 0;
+    const html = await Promise
+        .all(specs.map(async (element, index) => {
+            const split = element.split("LTLSPEC").map((x) => x.trim());
+            const nuxmvOutput = await bmc(v[0], index, bound, split[1]);
+            channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`);
+            return formatOutputBmc(split[0], json, nuxmvOutput);
+        }))
+        .then(outputs => {
+            channel.appendLine(`[${fname}] Done.`);
+            return `${htmlReport}${outputs.join("")}</body></html>`;
+        });
+    const panel = vscode.window.createWebviewPanel(
+        "verificationResults",
+        "Verification Results",
+        vscode.ViewColumn.Active
+    );
+    panel.webview.html = html;
+}
+
+async function formatOutputBmc(spec: string, json: string, out: string) {
+    const isFalse = out.indexOf("is false") > -1
+    const emoji = isFalse ? "❌" : "✅"
+    const lines = out
+        .split('\n')
+        .filter(x => !x.startsWith("***") && !x.startsWith("-- no counterexample found"))
+        .map(x => x.trim())
+        .filter(x => x);
+    return `<h2>${spec} ${emoji}</h2>
+<details>
+<summary>Full output</summary>
+<pre>${lines.join("\n")}</pre>
+</details>`;
+}
+
+/**
+ * Verify an LTLSPEC property using BMC.
+ * @param fname Name of the .smv file 
+ * @param index Index of property being verified
+ * @param bound The BMC bound
+ * @param spec The LTLSPEC being verified
+ */
+function bmc(fname: string, index: integer, bound: integer, spec: string) {
+    const smvCommands = `
+        set on_failure_script_quits 1
+        go_msat
+        build_boolean_model
+        bmc_setup
+        check_ltlspec_bmc -k ${bound} -p "${spec}"
+        quit`;
+    const script = temp.makeFile(`ltspec-${index}`, ".smv");
+
+    return new Promise<string>((resolve, reject) => {
+        writeFileSync(script, smvCommands);
+        const child = execFile("nuxmv", ["-source", script, fname], async (err,stdout,stderr) => {
+        temp.rmChild(fname, child);
+        temp.rm(script);
+        if (err) {
+            vscode.window.showErrorMessage(err.message);
+            reject(err.message);
+        } else {
+            resolve(stdout);
+        }
         });
         temp.addChild(fname, child);
     });
