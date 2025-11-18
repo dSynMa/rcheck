@@ -97,8 +97,12 @@
                 "title": "R-CHECK: Show SMV translation"
             },
             {
-                "command": "rcheck.verify",
+                "command": "rcheck.verify-ic3",
                 "title": "R-CHECK: Model-check using IC3"
+            },
+            {
+                "command": "rcheck.verify-bmc",
+                "title": "R-CHECK: Model-check using BMC"
             }
         ],
         "menus": {
@@ -116,7 +120,11 @@
                     "when": "resourceExtname == .rcp"
                 },
                 {
-                    "command": "rcheck.verify",
+                    "command": "rcheck.verify-ic3",
+                    "when": "resourceExtname == .rcp"
+                },
+                {
+                    "command": "rcheck.verify-bmc",
                     "when": "resourceExtname == .rcp"
                 }
             ]
