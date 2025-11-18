@@ -114,7 +114,7 @@ async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const nuxmvOutput = await ic3(v[0], index, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
-            return formatOutputIc3(split[0], json, nuxmvOutput);
+            return formatNuXmvOutput(split[0], json, nuxmvOutput);
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
@@ -128,7 +128,7 @@ async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult
     panel.webview.html = html;
 }
 
-async function formatOutputIc3(spec: string, json: string, out: string) {
+async function formatNuXmvOutput(spec: string, json: string, out: string) {
     const isTrue = out.indexOf("is true") > -1
     const isFalse = out.indexOf("is false") > -1
     const emoji = isTrue ? "✅" : isFalse ? "❌" : "❔"
@@ -248,7 +248,7 @@ async function verifySpecsBmc(fname:string, json: string, bound: integer, v: [st
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const nuxmvOutput = await bmc(v[0], index, bound, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`);
-            return formatOutputIc3(split[0], json, nuxmvOutput);
+            return formatNuXmvOutput(split[0], json, nuxmvOutput);
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
