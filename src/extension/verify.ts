@@ -276,7 +276,7 @@ function bmc(fname: string, index: integer, bound: integer, spec: string) {
         go_msat
         build_boolean_model
         bmc_setup
-        check_ltlspec_bmc -k ${bound} -p "${spec}"
+        msat_check_ltlspec_bmc -k ${bound} -p "${spec}"
         quit`;
     const script = temp.makeFile(`ltspec-${index}`, ".smv");
 
