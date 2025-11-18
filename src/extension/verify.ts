@@ -248,7 +248,7 @@ async function verifySpecsBmc(fname:string, json: string, bound: integer, v: [st
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const nuxmvOutput = await bmc(v[0], index, bound, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`);
-            return formatOutputBmc(split[0], json, nuxmvOutput);
+            return formatOutputIc3(split[0], json, nuxmvOutput);
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
@@ -262,20 +262,6 @@ async function verifySpecsBmc(fname:string, json: string, bound: integer, v: [st
     panel.webview.html = html;
 }
 
-async function formatOutputBmc(spec: string, json: string, out: string) {
-    const isFalse = out.indexOf("is false") > -1
-    const emoji = isFalse ? "❌" : "✅"
-    const lines = out
-        .split('\n')
-        .filter(x => !x.startsWith("***") && !x.startsWith("-- no counterexample found"))
-        .map(x => x.trim())
-        .filter(x => x);
-    return `<h2>${spec} ${emoji}</h2>
-<details>
-<summary>Full output</summary>
-<pre>${lines.join("\n")}</pre>
-</details>`;
-}
 
 /**
  * Verify an LTLSPEC property using BMC.
