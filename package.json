@@ -50,10 +50,10 @@
         "chalk": "~5.6.0",
         "commander": "~11.0.0",
         "ejs": "^3.1.10",
-        "langium": "~3.5.0",
+        "langium": "~4.1.0",
         "monaco-languageclient": "~9.11.0",
-        "typir": "~0.2.2",
-        "typir-langium": "~0.2.2",
+        "typir": "~0.3.2",
+        "typir-langium": "~0.3.2",
         "vscode-languageclient": "~9.0.1",
         "vscode-languageserver": "~9.0.1"
     },
@@ -65,7 +65,7 @@
         "concurrently": "~9.2.0",
         "esbuild": "^0.25.5",
         "http-server": "~14.1.1",
-        "langium-cli": "~3.5.0",
+        "langium-cli": "~4.1.0",
         "typescript": "~5.9.2",
         "vite": "^7.0.0",
         "vitest": "^3.2.0"

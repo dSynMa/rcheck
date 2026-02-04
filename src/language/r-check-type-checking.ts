@@ -1,30 +1,118 @@
 import { assertUnreachable, AstNode } from "langium";
 import {
+  AnnotatedTypeAfterValidation,
+  ClassTypeDetails,
   InferenceRuleNotApplicable, InferOperatorWithMultipleOperands,
   InferOperatorWithSingleOperand, isClassType, NO_PARAMETER_NAME, Type,
-  TypirServices, ValidationProblemAcceptor
+  TypirServices,
+  ValidationMessageProperties, ValidationProblemAcceptor
 } from "typir";
 import {
-  LangiumTypeSystemDefinition, TypirLangiumServices
+  LangiumTypeSystemDefinition, TypirLangiumServices,
+  TypirLangiumSpecifics
 } from "typir-langium";
 import {
-  Agent, Assign, AutomatonState, BinExpr, BinObs, Box, Diamond, Enum, ExistsObs,
+  Agent, Assign,
+  AutomatonState,
+  BinExpr, BinObs, Box, CompoundExpr, Diamond, Enum, ExistsObs,
   Finally, ForallObs, Get, Globally, Guard, GuardCall, isAgent, isAssign,
+  isAutomatonState,
   isBinExpr, isBinObs, isBoolLiteral, isBox, isBroadcast, isCase, isChannelObs,
   isChannelRef, isDiamond, isEnum, isExistsObs, isForallObs, isGet, isGetterObs,
-  isGuard, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct,
-  isMyself, isNeg, isNumberLiteral, isParam, isPropVar, isRange, isReceive,
-  isRelabel, isSend, isSenderObs, isSupply, isUMinus, MsgStruct, Neg, Next, Param,
-  PropVar, QualifiedRef, RCheckAstType, Receive, Relabel, Send, Supply,
-  SupplyLocationExpr, UMinus
+  isGuard, isGuardCall, isInstance, isLiteralObs, isLocal, isLtolMod, isLtolQuant, isMsgStruct,
+  isMyself, isNeg, isNumberLiteral, isParam, isPropVar, isQualifiedRef, isRange, isReceive,
+  isRelabel, isSend, isSenderObs, isSupply, isSupplyLocationExpr, isUMinus, Local, MsgStruct, Neg, Next, Param,
+  PropVar,
+  QualifiedRef,
+  RCheckAstType, Receive, Relabel, Send, Supply,
+  SupplyLocationExpr, Target, UMinus
 } from "./generated/ast.js";
 import {
-  getClassDetails, getTypeName, intersectMaps, IntRange, isComparisonOp,
-  validateAssignment
+  getProcessNames, getTypeName, intersectMaps, IntRange, isComparisonOp
 } from "./util.js";
 
-export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstType> {
-  onInitialize(typir: TypirLangiumServices<RCheckAstType>): void {
+export interface RCheckTypirSpecifics extends TypirLangiumSpecifics {
+  LanguageType: AstNode,
+  AstTypes: RCheckAstType,
+  ValidationMessageProperties: ValidationMessageProperties
+}
+
+const getClassDetails = (agent: Agent): ClassTypeDetails<RCheckTypirSpecifics> => {
+  const fieldNames = new Set<string>(["automaton-state"]);
+
+  const locals = agent.locals
+    .map((l) => {
+      if (fieldNames.has(l.name)) {
+        return undefined;
+      }
+      fieldNames.add(l.name);
+      return { name: l.name, type: l };
+    })
+    .filter((l): l is { name: string; type: Local } => l !== undefined);
+
+  const processes = getProcessNames(agent)
+    .map((n) => {
+      if (fieldNames.has(n)) {
+        return undefined;
+      }
+      fieldNames.add(n);
+      return { name: n, type: "bool" };
+    })
+    .filter((p): p is { name: string; type: string } => p !== undefined);
+
+  return {
+    className: agent.name,
+    fields: [{ name: "automaton-state", type: "int" }, ...processes, ...locals],
+    methods: [],
+  };
+};
+
+const validateAssignment = (
+  targetNode: Target,
+  exprNode: CompoundExpr,
+  relabel: boolean,
+  getTypeName: (type: AnnotatedTypeAfterValidation) => string | undefined,
+  accept: ValidationProblemAcceptor<RCheckTypirSpecifics>,
+  typir: TypirServices<RCheckTypirSpecifics>
+) => {
+  const node = exprNode.$container as AstNode;
+  const property = relabel ? "var" : "left";
+
+  const typeInt = typir.factory.Primitives.get({ primitiveName: "int" });
+  const typeRange = typir.factory.Primitives.get({ primitiveName: "range" });
+
+  const targetType = typir.Inference.inferType(targetNode);
+  const exprType = typir.Inference.inferType(exprNode);
+
+  if (targetType === typeRange && (exprType === typeInt || exprType === typeRange)) {
+    const targetRange = IntRange.fromRangeExpr(targetNode);
+    const exprRange = IntRange.fromRangeExpr(exprNode);
+
+    if (!targetRange.contains(exprRange)) {
+      accept({
+        message: `Range variable cannot be ${relabel ? "relabelled" : "assigned"
+        } as the range '${targetRange}' does not contain the range of the expression '${exprRange}'.`,
+        languageNode: node,
+        languageProperty: property,
+        severity: "error",
+      });
+    }
+  } else {
+    typir.validation.Constraints.ensureNodeIsAssignable(exprNode, targetNode, accept, (actual, expected) => ({
+      message: `${relabel ? "Variable" : "Expression"} of type '${getTypeName(
+        relabel ? expected : actual
+      )}' cannot be ${
+        relabel ? "relabelled with expression of type" : "assigned to variable of type"
+      } '${getTypeName(property === "var" ? actual : expected)}'.`,
+      languageNode: node,
+      languageProperty: property,
+      severity: "error",
+    }));
+  }
+};
+
+export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckTypirSpecifics> {
+  onInitialize(typir: TypirLangiumServices<RCheckTypirSpecifics>): void {
     // Define the primitive types
     const typeBool = typir.factory.Primitives.create({ primitiveName: "bool" })
       .inferenceRule({ filter: isBoolLiteral })
@@ -37,7 +125,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isSend })
       .inferenceRule({ filter: isReceive })
       .inferenceRule({
-        languageKey: [Param, MsgStruct, PropVar],
+        filter: (node) => isParam(node) || isMsgStruct(node) || isPropVar(node),
         matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "bool",
       })
       .finish();
@@ -45,7 +133,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     const typeInt = typir.factory.Primitives.create({ primitiveName: "int" })
       .inferenceRule({ filter: isNumberLiteral })
       .inferenceRule({
-        languageKey: [Param, MsgStruct, PropVar],
+        filter: (node) => isParam(node) || isMsgStruct(node) || isPropVar(node),
         matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "int",
       })
       .finish();
@@ -55,7 +143,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     })
       .inferenceRule({ filter: isRange })
       .inferenceRule({
-        languageKey: [Param, MsgStruct, PropVar],
+        filter: (node) => isParam(node) || isMsgStruct(node) || isPropVar(node),
         matching: (node: Param | MsgStruct | PropVar) => node.rangeType !== undefined,
       })
       .finish();
@@ -66,12 +154,12 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       primitiveName: "location",
     })
       .inferenceRule({
-        languageKey: [Param, MsgStruct, PropVar],
+        filter: (node) => isParam(node) || isMsgStruct(node) || isPropVar(node),
         matching: (node: Param | MsgStruct | PropVar) => node.builtinType === "location",
       })
       .inferenceRule({ filter: isMyself })
       .inferenceRule({
-        languageKey: SupplyLocationExpr,
+        filter: isSupplyLocationExpr,
         matching: (node: SupplyLocationExpr) => node.myself !== undefined || node.any !== undefined,
       })
       .inferenceRule({ filter: isInstance })
@@ -83,11 +171,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       .inferenceRule({ filter: isChannelRef })
       .inferenceRule({ filter: isBroadcast })
       .inferenceRule({
-        languageKey: [Param, MsgStruct, PropVar],
+        filter: (node) => isParam(node) || isMsgStruct(node) || isPropVar(node),
         matching: (node: Param | MsgStruct | PropVar) => node.customType?.ref?.name === "channel",
       })
       .inferenceRule({
-        languageKey: Enum,
+        filter: isEnum,
         matching: (node: Enum) => node.name === "channel",
       })
       .finish();
@@ -95,7 +183,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     const typeAny = typir.factory.Top.create({}).finish();
 
     // Inference rule for binary operators
-    const binaryInferenceRule: InferOperatorWithMultipleOperands<AstNode, BinExpr> = {
+    const binaryInferenceRule: InferOperatorWithMultipleOperands<RCheckTypirSpecifics, BinExpr> = {
       filter: isBinExpr,
       matching: (node: BinExpr, name: string) => node.operator === name,
       operands: (node: BinExpr) => [node.left, node.right],
@@ -245,7 +333,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     const isUnaryExpression = (node: AstNode): node is UnaryExpression => {
       return isUMinus(node) || isNeg(node) || isLtolMod(node) || isForallObs(node) || isExistsObs(node);
     };
-    const unaryInferenceRule: InferOperatorWithSingleOperand<AstNode, UnaryExpression> = {
+    const unaryInferenceRule: InferOperatorWithSingleOperand<RCheckTypirSpecifics, UnaryExpression> = {
       filter: isUnaryExpression,
       matching: (node: UnaryExpression, name: string) => node.operator === name,
       operand: (node: UnaryExpression) => node.expr,
@@ -398,8 +486,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
     const validateCmdHeader = (
       node: Send | Receive | Get | Supply,
-      accept: ValidationProblemAcceptor<AstNode>,
-      typir: TypirServices<AstNode>
+      accept: ValidationProblemAcceptor<RCheckTypirSpecifics>,
+      typir: TypirServices<RCheckTypirSpecifics>
     ) => {
       typir.validation.Constraints.ensureNodeIsEquals(node.psi, typeBool, accept, (actual, expected) => ({
         message: `Type mismatch in command guard expression: expected '${getTypeName(
@@ -411,8 +499,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     };
     const validateChannelExpr = (
       node: Send | Receive,
-      accept: ValidationProblemAcceptor<AstNode>,
-      typir: TypirServices<AstNode>
+      accept: ValidationProblemAcceptor<RCheckTypirSpecifics>,
+      typir: TypirServices<RCheckTypirSpecifics>
     ) => {
       typir.validation.Constraints.ensureNodeIsEquals(node.chanExpr, typeChannel, accept, (actual, expected) => ({
         message: `Type mismatch in command channel expression: expected '${getTypeName(
@@ -424,8 +512,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     };
     const validateSupplyLocation = (
       node: Supply,
-      accept: ValidationProblemAcceptor<AstNode>,
-      typir: TypirServices<AstNode>
+      accept: ValidationProblemAcceptor<RCheckTypirSpecifics>,
+      typir: TypirServices<RCheckTypirSpecifics>
     ) => {
       typir.validation.Constraints.ensureNodeIsEquals(node.where, typeLocation, accept, (actual, expected) => ({
         message: `Type mismatch in command where: expected '${getTypeName(expected)}', but got '${getTypeName(
@@ -437,8 +525,8 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     };
     const validateGetLocation = (
       node: Get,
-      accept: ValidationProblemAcceptor<AstNode>,
-      typir: TypirServices<AstNode>
+      accept: ValidationProblemAcceptor<RCheckTypirSpecifics>,
+      typir: TypirServices<RCheckTypirSpecifics>
     ) => {
       const actual = typir.Inference.inferType(node.where);
       if (actual instanceof Type && actual.getIdentifier() !== "bool" && actual.getIdentifier() !== "location") {
@@ -574,7 +662,7 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
     });
   }
 
-  onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckAstType>): void {
+  onNewAstNode(languageNode: AstNode, typir: TypirLangiumServices<RCheckTypirSpecifics>): void {
     if (isEnum(languageNode)) {
       // Exclude channel enum here
       if (languageNode.name === "channel") return;
@@ -588,11 +676,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
       // Create new enum type
       typir.factory.Primitives.create({ primitiveName: enumName })
         .inferenceRule({
-          languageKey: [Param, MsgStruct, PropVar],
+          filter: (node) => isParam(node) || isMsgStruct(node) || isPropVar(node),
           matching: (node: Param | MsgStruct | PropVar) => languageNode === node.customType?.ref,
         })
         .inferenceRule({
-          languageKey: Enum,
+          filter: isEnum,
           matching: (node: Enum) => languageNode === node,
         })
         .finish();
@@ -609,11 +697,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
         associatedLanguageNode: languageNode,
       })
         .inferenceRuleForDeclaration({
-          languageKey: Guard,
+          filter: isGuard,
           matching: (node: Guard) => languageNode === node,
         })
         .inferenceRuleForCalls({
-          languageKey: GuardCall,
+          filter: isGuardCall,
           matching: (node: GuardCall) => languageNode === node.guard.ref,
           inputArguments: (node: GuardCall) => node.args,
           validateArgumentsOfFunctionCalls: true,
@@ -629,11 +717,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
       typir.factory.Classes.create(getClassDetails(languageNode))
         .inferenceRuleForClassDeclaration({
-          languageKey: Agent,
+          filter: isAgent,
           matching: (node: Agent) => languageNode === node,
         })
         .inferenceRuleForFieldAccess({
-          languageKey: QualifiedRef,
+          filter: isQualifiedRef,
           matching: (node: QualifiedRef) => {
             const qualifier = node.instance.ref;
             // Handle LtolQuant inference separately
@@ -641,10 +729,11 @@ export class RCheckTypeSystem implements LangiumTypeSystemDefinition<RCheckAstTy
 
             return qualifier?.agent.ref === languageNode;
           },
-          field: (node: QualifiedRef) => node.variable.ref!,
+          
+          field: (node: QualifiedRef) => node.variable.ref!.name!,
         })
         .inferenceRuleForFieldAccess({
-          languageKey: AutomatonState,
+          filter: isAutomatonState,
           matching: (node: AutomatonState) => languageNode === node.instance.ref?.agent.ref,
           field: () => "automaton-state",
         })
