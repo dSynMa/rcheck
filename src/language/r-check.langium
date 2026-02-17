@@ -65,13 +65,13 @@ Supply:
 type Command = Send | Receive | Get | Supply;
 type Process = BaseProcess | Rep | Sequence | Choice;
 
-Assign: MessageAssign | UpdateAssign ;
+type Assign = MessageAssign | UpdateAssign ;
 MessageAssign: left=[MsgStruct] ':=' right=CompoundExpr;
 UpdateAssign: left=[Local] ':=' right=CompoundExpr;
 
-ChannelExprRef: Case | Local;
+type ChannelExprRef = Case | Local;
 ChannelExpr: (channel=[ChannelExprRef] | bcast = '*');
-LocationExprRef: Local;
+type LocationExprRef = Local;
 SupplyLocationExpr: (location=[LocationExprRef] | myself="myself" | any="any");
 GetLocationExpr: predicate=CompoundExpr;
 
@@ -86,7 +86,7 @@ Range: lower=INT '..' upper=INT;
 fragment Params:
     params+=Param (',' params+=Param)* ;
 
-Target: Local | Case | Param | MsgStruct | PropVar | Send | Receive | Get | Supply | Instance;
+type Target = Local | Case | Param | MsgStruct | PropVar | Send | Receive | Get | Supply | Instance;
 
 Local: TypedDeclaration;
 Param: TypedDeclaration;
@@ -108,7 +108,7 @@ AddSub infers CompoundExpr:
 MulDiv infers CompoundExpr:
     Logical ({infer BinExpr.left=current} operator=('*' | '/') right=Logical)*;
 
-Qualifier : Instance | LtolQuant;
+type Qualifier = Instance | LtolQuant;
 
 BaseExpr infers CompoundExpr:
     '(' AddSub ')'

@@ -1,8 +1,7 @@
-import { AstNode } from "langium";
 import { NodeFileSystem } from "langium/node";
-import { AnnotatedTypeAfterValidation, ClassTypeDetails, TypirServices, ValidationProblemAcceptor } from "typir";
+import { AnnotatedTypeAfterValidation } from "typir";
 import { extractAstNode } from "../cli/cli-util.js";
-import { Agent, BaseProcess, BinExpr, CompoundExpr, isBinExpr, isChoice, isGet, isLocal, isMsgStruct, isNumberLiteral, isParam, isPropVar, isPropVarRef, isQualifiedRef, isReceive, isRef, isRep, isSend, isSequence, isSupply, isTarget, isUMinus, Local, Model, PropVar, Sequence, Target } from "./generated/ast.js";
+import { Agent, BaseProcess, BinExpr, CompoundExpr, isBinExpr, isChoice, isGet, isLocal, isMsgStruct, isNumberLiteral, isParam, isPropVar, isPropVarRef, isQualifiedRef, isReceive, isRef, isRep, isSend, isSequence, isSupply, isTarget, isUMinus, Model, PropVar, Sequence, Target } from "./generated/ast.js";
 import { createRCheckServices } from "./r-check-module.js";
 
 export async function parseToJson(fileName: string) {
@@ -70,7 +69,7 @@ export class IntRange {
           );
         }
       } else {
-        throw new Error("Unexpected target found.");
+        throw new Error(`Unexpected target found: '${decl?.$type}'.`);
       }
     } else if (isNumberLiteral(expr)) {
       return new this(expr.value, expr.value);
@@ -173,36 +172,6 @@ export const isComparisonOp = (o: BinExpr["operator"]): o is ComparisonOp => {
   return o === "<" || o === "<=" || o === ">" || o === ">=";
 };
 
-export const getClassDetails = (agent: Agent): ClassTypeDetails<AstNode> => {
-  const fieldNames = new Set<string>(["automaton-state"]);
-
-  const locals = agent.locals
-    .map((l) => {
-      if (fieldNames.has(l.name)) {
-        return undefined;
-      }
-      fieldNames.add(l.name);
-      return { name: l.name, type: l };
-    })
-    .filter((l): l is { name: string; type: Local } => l !== undefined);
-
-  const processes = getProcessNames(agent)
-    .map((n) => {
-      if (fieldNames.has(n)) {
-        return undefined;
-      }
-      fieldNames.add(n);
-      return { name: n, type: "bool" };
-    })
-    .filter((p): p is { name: string; type: string } => p !== undefined);
-
-  return {
-    className: agent.name,
-    fields: [{ name: "automaton-state", type: "int" }, ...processes, ...locals],
-    methods: [],
-  };
-};
-
 export const getProcessNames = (agent: Agent): string[] => {
   const stack: (BaseProcess | Sequence)[] = [agent.repeat];
   const processNames: string[] = [];
@@ -264,46 +233,4 @@ export const intersectMaps = <K, V>(maps: Map<K, V>[]): Map<K, V> => {
   return resultMap;
 };
 
-export const validateAssignment = (
-  targetNode: Target,
-  exprNode: CompoundExpr,
-  relabel: boolean,
-  getTypeName: (type: AnnotatedTypeAfterValidation) => string | undefined,
-  accept: ValidationProblemAcceptor<AstNode>,
-  typir: TypirServices<AstNode>
-) => {
-  const node = exprNode.$container as AstNode;
-  const property = relabel ? "var" : "left";
 
-  const typeInt = typir.factory.Primitives.get({ primitiveName: "int" });
-  const typeRange = typir.factory.Primitives.get({ primitiveName: "range" });
-
-  const targetType = typir.Inference.inferType(targetNode);
-  const exprType = typir.Inference.inferType(exprNode);
-
-  if (targetType === typeRange && (exprType === typeInt || exprType === typeRange)) {
-    const targetRange = IntRange.fromRangeExpr(targetNode);
-    const exprRange = IntRange.fromRangeExpr(exprNode);
-
-    if (!targetRange.contains(exprRange)) {
-      accept({
-        message: `Range variable cannot be ${relabel ? "relabelled" : "assigned"
-        } as the range '${targetRange}' does not contain the range of the expression '${exprRange}'.`,
-        languageNode: node,
-        languageProperty: property,
-        severity: "error",
-      });
-    }
-  } else {
-    typir.validation.Constraints.ensureNodeIsAssignable(exprNode, targetNode, accept, (actual, expected) => ({
-      message: `${relabel ? "Variable" : "Expression"} of type '${getTypeName(
-        relabel ? expected : actual
-      )}' cannot be ${
-        relabel ? "relabelled with expression of type" : "assigned to variable of type"
-      } '${getTypeName(property === "var" ? actual : expected)}'.`,
-      languageNode: node,
-      languageProperty: property,
-      severity: "error",
-    }));
-  }
-};

@@ -1,12 +1,12 @@
-import type { AstNode, AstNodeDescription, LangiumDocument, LangiumSharedCoreServices, Module, PrecomputedScopes, ReferenceInfo, Scope } from 'langium';
-import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, inject } from 'langium';
+import type { AstNode, AstNodeDescription, LangiumDocument, LangiumSharedCoreServices, LocalSymbols, Module, ReferenceInfo, Scope } from 'langium';
+import { AstUtils, DefaultScopeComputation, DefaultScopeProvider, inject, MultiMap } from 'langium';
 import { CancellationToken } from 'vscode-languageserver';
-import { Model, QualifiedRef, isEnum, isQualifiedRef, isPropVar, isCommand, Command, RCheckAstType, reflection} from './generated/ast.js';
+import { Model, QualifiedRef, isEnum, isQualifiedRef, isPropVar, isCommand, Command, reflection} from './generated/ast.js';
 import { RCheckGeneratedModule, RCheckGeneratedSharedModule } from './generated/module.js';
 import { RCheckValidator, registerValidationChecks } from './r-check-validator.js';
 import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
 import { createTypirLangiumServices, initializeLangiumTypirServices, TypirLangiumServices } from 'typir-langium';
-import { RCheckTypeSystem } from './r-check-type-checking.js';
+import { RCheckTypeSystem, RCheckTypirSpecifics } from './r-check-type-checking.js';
 
 
 export class RCheckScopeProvider extends DefaultScopeProvider {
@@ -35,9 +35,13 @@ export class RCheckScopeProvider extends DefaultScopeProvider {
 
 export class RCheckScopeComputation extends DefaultScopeComputation {
 
-    override async computeLocalScopes(document: LangiumDocument<AstNode>, cancelToken?: CancellationToken | undefined): Promise<PrecomputedScopes> {
+    override async collectLocalSymbols(document: LangiumDocument<AstNode>, cancelToken?: CancellationToken | undefined): Promise<LocalSymbols> {
         
-        const scopes = await super.computeLocalScopes(document, cancelToken);
+        const locals = await super.collectLocalSymbols(document, cancelToken) as MultiMap<AstNode, AstNodeDescription>;
+        const scopes = new MultiMap<AstNode, AstNodeDescription>(locals);
+        
+
+
         const model = document.parseResult.value as Model;
         // This map stores a list of descriptions for each node in our document
         
@@ -132,7 +136,7 @@ export type RCheckAddedServices = {
     validation: {
         RCheckValidator: RCheckValidator
     },
-    typir: TypirLangiumServices<RCheckAstType>,
+    typir: TypirLangiumServices<RCheckTypirSpecifics>,
 }
 
 /**
