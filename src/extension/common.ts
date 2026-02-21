@@ -54,13 +54,19 @@ export async function renderTemplate(ctx: vscode.ExtensionContext, fname: string
     const elementsUri = webview.asWebviewUri(
         vscode.Uri.joinPath(
             ctx.extensionUri,
-            "node_modules",
-            "@vscode-elements/elements",
-            "dist",
-            "bundled.js"
+            "node_modules", "@vscode-elements",
+            "elements", "dist", "bundled.js"
+        )
+    );
+    const codiconsUri = webview.asWebviewUri(
+        vscode.Uri.joinPath(
+            ctx.extensionUri,
+            "node_modules", "@vscode", "codicons",
+            "dist", "codicon.css"
         )
     );
     data["elementsUri"] = elementsUri;
+    data["codiconsUri"] = codiconsUri;
     data["cspSource"] = webview.cspSource;
     const html = ejs.renderFile(filePath, data);
     return html;

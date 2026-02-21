@@ -1,0 +1,38 @@
+{% if (transition != undefined) { %}
+<vscode-table-row>
+    <vscode-table-cell></vscode-table-cell>
+    <vscode-table-cell>
+<table>
+    <tr><td><em>{%= isSupplyGet ? "Supplier" : "Sender" %}: </em></td>
+    <td>{%= transition.sender %}</td></tr>
+    <tr><td><em>Command: </em></td><td><pre>{%= transition.send %}</pre></td></tr>
+    <tr><td><em>{%= isSupplyGet ? "Getter" : "Receivers" %}: </em></td>
+    <td>{%= transition.receivers.join(", ") %}</td></tr>
+</table>
+    </vscode-table-cell>
+</vscode-table-row>
+{% } %}
+<vscode-table-row>
+<vscode-table-cell>
+{%= depth %}
+{% if (loop) { %}<br /><em>Loop starts here</em>{% } %}
+{% if (deadlock) { %}<br /><em>Deadlock state</em>{% } %} 
+</vscode-table-cell>
+<vscode-table-cell>
+<table>
+    {% Object.keys(step).sort().forEach(function(agent) { %}
+    <tr key="{%= agent %}"></tr>
+    <td>{%= agent %}:</td>
+    <td><span>
+        {% Object.keys(step[agent]).filter(k => (k === "**state**") || !k.startsWith("**")).sort().forEach(function(varName) { %}
+        <div>{% if (varName === "**state**") { %}
+        <em>state</em>
+        {% } else { %}
+        {%= varName %}
+        {% } %}: {%= step[agent][varName] %}</div>
+        {% }); %}
+    </span></td>
+    {% }); %}
+</table>
+</vscode-table-cell>
+</vscode-table-row>
