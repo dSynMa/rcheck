@@ -3,13 +3,16 @@ import * as vscode from "vscode";
 import { Temp } from "./temp.js";
 import { writeFileSync } from "node:fs";
 import { integer } from "vscode-languageserver";
-import { execPromise, ExecResult, getCurrentRcpFile, readPromise, runJar, writePromise } from "./common.js";
-import { formatStep, formatTransition, renderStep, Step } from "./cex.js";
+import { execPromise, ExecResult, getCurrentRcpFile, readPromise, renderTemplate, runJar, writePromise } from "./common.js";
+import { renderStep, Step } from "./cex.js";
 
 let temp: Temp
 let channel: vscode.OutputChannel
+let ctx: vscode.ExtensionContext
+let panel: vscode.WebviewPanel
 
 export class Verify {
+
     constructor(t: Temp, chan: vscode.OutputChannel) {
         channel = chan;
         temp = t;
@@ -61,6 +64,7 @@ export class Verify {
                 .catch(vscode.window.showErrorMessage);
             })
         );
+        ctx = context;
     }
 }
 
@@ -94,22 +98,26 @@ async function findSpecs(value: ExecResult) {
  * Launch verification tasks
  */
 async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult]) {
+    panel = vscode.window.createWebviewPanel(
+        "verificationResults",
+        "Verification Results",
+        vscode.ViewColumn.Active,
+        {enableScripts: true, retainContextWhenHidden: true}
+    );
+    const tmpHtml = await renderTemplate(
+        ctx, "verify.html", {
+            fname: fname,
+            body: undefined
+        },
+        panel.webview);
+    panel.webview.html = tmpHtml;
+
     const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
     channel.show();
     channel.appendLine(`[${fname}] Model checking started...`);
-    const title = `R-CHECK: Verification of ${fname}`
-    let htmlReport =  `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
-</head>
-<body>
-    <h1>${title}</h1>`
-    
+
     let count = 0;
-    const html = await Promise
+    const body = await Promise
         .all(specs.map(async (element, index) => {
             const split = element.split("LTLSPEC").map((x) => x.trim());
             const nuxmvOutput = await ic3(v[0], index, split[1]);
@@ -118,63 +126,64 @@ async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
-            return `${htmlReport}${outputs.join("")}</body></html>`;
+            return outputs.join("");
         });
-    const panel = vscode.window.createWebviewPanel(
-        "verificationResults",
-        "Verification Results",
-        vscode.ViewColumn.Active
-    );
-    panel.webview.html = html;
+        panel.webview.html = await renderTemplate(
+            ctx, "verify.html", {
+                fname: fname,
+                body: body
+            },
+            panel.webview);
 }
 
 async function formatNuXmvOutput(spec: string, json: string, out: string) {
-    const isTrue = out.indexOf("is true") > -1
-    const isFalse = out.indexOf("is false") > -1
-    const emoji = isTrue ? "✅" : isFalse ? "❌" : "❔"
-    let table = "";
-    if (isFalse) {
-        const cexFile = temp.makeFile("cex", ".txt");
-        // TODO promisify this
-        const tbody = await writePromise(cexFile, out)
-            .then(() => runJar(["-j", json, "-cex", cexFile]))
-            .then(v => JSON.parse(v.stdout), channel.appendLine)
-            .then((cex: Step[]) => cex.map(s => {
-                    const tr = (
-                        s.inboundTransition != undefined
-                        ? `<tr><td></td><td>${formatTransition(s.inboundTransition)}</td></tr>`
-                        : "")
-                    const fmtLoop = s.___LOOP___ && !s.___DEADLOCK___ ? "<br /><em>Loop starts here</em>" : "";
-                    const fmtDeadlock = s.___DEADLOCK___ ? "<br /><em>Deadlock state</em>" : "";
-                    return `${tr}<tr><td>${s.depth}${fmtLoop}${fmtDeadlock}</td><td>${formatStep(renderStep(cex, s))}</td></tr>`
-                }))
-            .catch((e) => {
-                channel.appendLine(e);
-                return [];
-            })
-            .then(s => s.join("\n"));
-        table = tbody === "" ? "" : `
-<table striped bordered hover>
-<thead>
-<tr>
-<th>#Step</th>
-<th>Changed Variables</th>
-</tr>
-</thead>
-<tbody>${tbody}</tbody></table>`
-    }
+    const isTrue = out.indexOf("is true") > -1;
+    const isFalse = out.indexOf("is false") > -1;
 
     const lines = out
         .split('\n')
         .filter(x => !x.startsWith("***") && !x.startsWith("-- no proof or counterexample found"))
         .map(x => x.trim())
         .filter(x => x);
-    return `<h2>${spec} ${emoji}</h2>
-${table}
-<details>
-<summary>Full output</summary>
-<pre>${lines.join("\n")}</pre>
-</details>`;
+
+    let table = "";
+    if (isFalse) {
+        const cexFile = temp.makeFile("cex", ".txt");
+        // TODO promisify this
+        table = await writePromise(cexFile, out)
+            .then(() => runJar(["-j", json, "-cex", cexFile]))
+            .then(v => JSON.parse(v.stdout), channel.appendLine)
+            .then((cex: Step[]) => cex.map(async s => {
+                const render = await renderTemplate(
+                    ctx, "_step.html", 
+                    {
+                        deadlock: s.___DEADLOCK___,
+                        depth: s.depth,
+                        isSupplyGet: s.inboundTransition?.hasOwnProperty("___get-supply___"),
+                        loop: s.___LOOP___ && !s.___DEADLOCK___,
+                        step: renderStep(cex, s),
+                        transition: s.inboundTransition
+                    },
+                    panel.webview);
+                return render;
+            }))
+            .then(outputs => Promise.all(outputs))
+            .catch((e) => {
+                channel.appendLine(e);
+                return [];
+            })
+            .then(s => s.join("\n"));
+    }
+    const render = await renderTemplate(
+        ctx, "_verify.single.html", 
+        {
+        tbody: table,
+        spec: spec,
+        isTrue: isTrue,
+        isFalse: isFalse,
+        output: lines.join("\n")
+        }, panel.webview);
+    return render;
 }
 
 /**
@@ -257,7 +266,8 @@ async function verifySpecsBmc(fname:string, json: string, bound: integer, v: [st
     const panel = vscode.window.createWebviewPanel(
         "verificationResults",
         "Verification Results",
-        vscode.ViewColumn.Active
+        vscode.ViewColumn.Active,
+        {enableScripts: true, retainContextWhenHidden: true}
     );
     panel.webview.html = html;
 }

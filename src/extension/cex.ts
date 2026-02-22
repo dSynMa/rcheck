@@ -32,32 +32,3 @@ export function renderStep(trace: Step[], x: Step) {
     return render;
 }
 
-export function formatStep(render: State) {
-    return `
-<table>
-${Object.keys(render).sort().map(agent => (
-    `<tr key=${agent}>
-        <td>${agent}:</td>
-        <td><span>${
-        Object.keys(render[agent])
-        .sort()
-        .filter(k => (k === "**state**") || !k.startsWith("**"))
-        .map(k => `${(k === "**state**") ? "<em>state</em>" : k}: ${render[agent][k]}`)
-        .filter(s => s.trim().length > 0)
-        .join(", ")
-        }</span></td>
-    </tr>`
-)).join("\n")}
-</table>`
-}
-
-export function formatTransition(t: Transition) {
-    const isSupplyGet = t.hasOwnProperty("___get-supply___");
-    return `<table>
-      <tr><td><em>${isSupplyGet ? "Supplier" : "Sender"}: </em></td>
-      <td>${t.sender}</td></tr>
-      <tr><td><em>Command: </em></td><td><pre>${t.send}</pre></td></tr>
-      <tr><td><em>${isSupplyGet ? "Getter" : "Receivers"}: </em></td>
-      <td>${t.receivers.join(", ")}</td></tr>
-    </table>`
-  }
