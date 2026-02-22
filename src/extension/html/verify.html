@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>R-CHECK: Verification of {%= fname %} (IC3)</title>
+    <title>R-CHECK: Verification of {%= fname %} ({%= subtitle %})</title>
     <script type="module" src="{%= elementsUri %}"></script>
     <link rel="stylesheet" href="{%= codiconsUri %}" id="vscode-codicon-stylesheet">
 </head>
 <body>
-    <h1>R-CHECK: Verification of {%= fname %} (IC3)</h1>
+    <h1>R-CHECK: Verification of {%= fname %}</h1>
+    <p>{%= subtitle %}</p>
     {% if (body != undefined) { %}{%- body %}
     {% } else { %}<vscode-icon name="loading" spin spin-duration="1" size="48"></vscode-icon>{% } %}
 </body>

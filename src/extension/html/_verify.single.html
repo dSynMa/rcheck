@@ -4,6 +4,7 @@
 {% } else { %} ❔ {% } %}
 </h2>
 
+{% if (tbody) { %}
 <vscode-table zebra bordered-rows resizable columns='["10%", "90%"]' min-column-width="5px">
 <vscode-table-header slot="header">
 <vscode-table-header-cell >#</vscode-table-header-cell >
@@ -13,6 +14,7 @@
     {%- tbody %}
 </vscode-table-body>
 </vscode-table>
+{% } %}
 
 <div>
     <vscode-collapsible heading="Full output">
