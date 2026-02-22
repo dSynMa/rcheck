@@ -28,13 +28,13 @@ export class Verify {
                 const rcpPath = getCurrentRcpFile()!;
                 const tmpJson = await temp.toJson(rcpPath);
                 check()
-                .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
-                .then(findSpecs)
-                .then(value => verifySpecsIc3(rcpPath, tmpJson, value))
-                .catch(vscode.window.showErrorMessage)
+                    .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
+                    .then(findSpecs)
+                    .then(value => verifySpecsIc3(rcpPath, tmpJson, value))
+                    .catch(vscode.window.showErrorMessage)
             }),
             vscode.commands.registerCommand('rcheck.verify-bmc', async () => {
-                
+
                 const rcpPath = getCurrentRcpFile()!;
                 const tmpJson = await temp.toJson(rcpPath);
                 const boundString = await vscode.window.showInputBox({
@@ -45,23 +45,23 @@ export class Verify {
                 });
                 const bound = boundString === '' ? 20 : parseInt(boundString!);
                 check()
-                .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
-                .then(findSpecs)
-                .then(value => verifySpecsBmc(rcpPath, tmpJson, bound, value))
-                .catch(vscode.window.showErrorMessage)
+                    .then(() => runJar(["-j", tmpJson, "--smv", "-tmp"]))
+                    .then(findSpecs)
+                    .then(value => verifySpecsBmc(rcpPath, tmpJson, bound, value))
+                    .catch(vscode.window.showErrorMessage)
             }),
             vscode.commands.registerCommand('rcheck.tosmv', async () => {
                 const rcpPath = getCurrentRcpFile()!;
                 temp.toJson(rcpPath)
-                .then((tmpJson) => runJar(["-j", tmpJson, "--smv", "-tmp"]))
-                .then(value => {
-                    const smvFile = value.stderr.trim();
-                    temp.addFile(smvFile);
-                    return smvFile;
-                })
-                .then(readPromise)
-                .then(showSmv)
-                .catch(vscode.window.showErrorMessage);
+                    .then((tmpJson) => runJar(["-j", tmpJson, "--smv", "-tmp"]))
+                    .then(value => {
+                        const smvFile = value.stderr.trim();
+                        temp.addFile(smvFile);
+                        return smvFile;
+                    })
+                    .then(readPromise)
+                    .then(showSmv)
+                    .catch(vscode.window.showErrorMessage);
             })
         );
         ctx = context;
@@ -73,13 +73,13 @@ async function showSmv(content: string) {
         "language": "nuxmv",
         "content": content
     })
-    .then(doc => vscode.window.showTextDocument(doc));
+        .then(doc => vscode.window.showTextDocument(doc));
 }
 
 async function check() {
     return new Promise<void>((resolve, reject) => {
         execFile("which", ["nuxmv"], (err, _) => {
-            if (err) {reject("This command requires nuxmv.")}
+            if (err) { reject("This command requires nuxmv.") }
             else resolve();
         });
     });
@@ -94,21 +94,26 @@ async function findSpecs(value: ExecResult) {
     return Promise.all([Promise.resolve(smvFile), execPromise("grep", ["-B", "1", "^LTLSPEC", smvFile])]);
 }
 
+async function verifySpecsIc3(fname: string, json: string, v: [string, ExecResult]) {
+    verifySpecs(fname, json, ic3, v, "IC3");
+}
+
 /**
  * Launch verification tasks
  */
-async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult]) {
+async function verifySpecs(fname: string, json: string, fn: Function, v: [string, ExecResult], subtitle: string) {
     panel = vscode.window.createWebviewPanel(
         "verificationResults",
         "Verification Results",
         vscode.ViewColumn.Active,
-        {enableScripts: true, retainContextWhenHidden: true}
+        { enableScripts: true, retainContextWhenHidden: true }
     );
     const tmpHtml = await renderTemplate(
         ctx, "verify.html", {
-            fname: fname,
-            body: undefined
-        },
+        fname: fname,
+        subtitle: subtitle,
+        body: undefined
+    },
         panel.webview);
     panel.webview.html = tmpHtml;
 
@@ -120,7 +125,7 @@ async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult
     const body = await Promise
         .all(specs.map(async (element, index) => {
             const split = element.split("LTLSPEC").map((x) => x.trim());
-            const nuxmvOutput = await ic3(v[0], index, split[1]);
+            const nuxmvOutput = await fn(v[0], index, split[1]);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
             return formatNuXmvOutput(split[0], json, nuxmvOutput);
         }))
@@ -128,12 +133,13 @@ async function verifySpecsIc3(fname:string, json: string, v: [string, ExecResult
             channel.appendLine(`[${fname}] Done.`);
             return outputs.join("");
         });
-        panel.webview.html = await renderTemplate(
-            ctx, "verify.html", {
-                fname: fname,
-                body: body
-            },
-            panel.webview);
+    panel.webview.html = await renderTemplate(
+        ctx, "verify.html", {
+        fname: fname,
+        subtitle: subtitle,
+        body: body
+    },
+        panel.webview);
 }
 
 async function formatNuXmvOutput(spec: string, json: string, out: string) {
@@ -155,7 +161,7 @@ async function formatNuXmvOutput(spec: string, json: string, out: string) {
             .then(v => JSON.parse(v.stdout), channel.appendLine)
             .then((cex: Step[]) => cex.map(async s => {
                 const render = await renderTemplate(
-                    ctx, "_step.html", 
+                    ctx, "_step.html",
                     {
                         deadlock: s.___DEADLOCK___,
                         depth: s.depth,
@@ -175,13 +181,13 @@ async function formatNuXmvOutput(spec: string, json: string, out: string) {
             .then(s => s.join("\n"));
     }
     const render = await renderTemplate(
-        ctx, "_verify.single.html", 
+        ctx, "_verify.single.html",
         {
-        tbody: table,
-        spec: spec,
-        isTrue: isTrue,
-        isFalse: isFalse,
-        output: lines.join("\n")
+            tbody: table,
+            spec: spec,
+            isTrue: isTrue,
+            isFalse: isFalse,
+            output: lines.join("\n")
         }, panel.webview);
     return render;
 }
@@ -192,7 +198,7 @@ async function formatNuXmvOutput(spec: string, json: string, out: string) {
  * @param index Index of property being verified
  * @param spec The LTLSPEC being verified
  */
-function ic3(fname: string, index: integer, spec: string, build_boolean_model: boolean=false) {
+function ic3(fname: string, index: integer, spec: string, build_boolean_model: boolean = false) {
     // TODO If spec starts with G one can use check_property_as_invar_ic3
     // TODO add optional ic3 bound limit in extension settings
     const smvCommands = `
@@ -205,7 +211,7 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
 
     return new Promise<string>((resolve, reject) => {
         writeFileSync(script, smvCommands);
-        const child = execFile("nuxmv", ["-source", script, fname], async (err,stdout,stderr) => {
+        const child = execFile("nuxmv", ["-source", script, fname], async (err, stdout, stderr) => {
             temp.rmChild(fname, child);
             temp.rm(script);
             if (err) {
@@ -234,74 +240,42 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
 }
 
 /**
- * Launch BMC verification tasks
- */
-async function verifySpecsBmc(fname:string, json: string, bound: integer, v: [string, ExecResult]) {
-    const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
-    channel.show();
-    channel.appendLine(`[${fname}] Model checking started...`);
-    const title = `R-CHECK: Verification of ${fname}`
-    let htmlReport =  `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
-</head>
-<body>
-    <h1>${title}</h1>`
-    
-    let count = 0;
-    const html = await Promise
-        .all(specs.map(async (element, index) => {
-            const split = element.split("LTLSPEC").map((x) => x.trim());
-            const nuxmvOutput = await bmc(v[0], index, bound, split[1]);
-            channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`);
-            return formatNuXmvOutput(split[0], json, nuxmvOutput);
-        }))
-        .then(outputs => {
-            channel.appendLine(`[${fname}] Done.`);
-            return `${htmlReport}${outputs.join("")}</body></html>`;
-        });
-    const panel = vscode.window.createWebviewPanel(
-        "verificationResults",
-        "Verification Results",
-        vscode.ViewColumn.Active,
-        {enableScripts: true, retainContextWhenHidden: true}
-    );
-    panel.webview.html = html;
-}
-
-
-/**
  * Verify an LTLSPEC property using BMC.
  * @param fname Name of the .smv file 
  * @param index Index of property being verified
  * @param bound The BMC bound
  * @param spec The LTLSPEC being verified
  */
-function bmc(fname: string, index: integer, bound: integer, spec: string) {
-    const smvCommands = `
-        set on_failure_script_quits 1
-        go_msat
-        build_boolean_model
-        bmc_setup
-        msat_check_ltlspec_bmc -k ${bound} -p "${spec}"
-        quit`;
-    const script = temp.makeFile(`ltspec-${index}`, ".smv");
+async function verifySpecsBmc(fname: string, json: string, bound: integer, v: [string, ExecResult]) {
+    const bmcFn = makeBmcFn(bound);
+    verifySpecs(fname, json, bmcFn, v, `BMC (bound: ${bound})`);
+}
 
-    return new Promise<string>((resolve, reject) => {
-        writeFileSync(script, smvCommands);
-        const child = execFile("nuxmv", ["-source", script, fname], async (err,stdout,stderr) => {
-        temp.rmChild(fname, child);
-        temp.rm(script);
-        if (err) {
-            vscode.window.showErrorMessage(err.message);
-            reject(err.message);
-        } else {
-            resolve(stdout);
-        }
+
+function makeBmcFn(bound: integer) {
+    return function (fname: string, index: integer, spec: string) {
+        const smvCommands = `
+            set on_failure_script_quits 1
+            go_msat
+            build_boolean_model
+            bmc_setup
+            msat_check_ltlspec_bmc -k ${bound} -p "${spec}"
+            quit`;
+        const script = temp.makeFile(`ltspec-${index}`, ".smv");
+
+        return new Promise<string>((resolve, reject) => {
+            writeFileSync(script, smvCommands);
+            const child = execFile("nuxmv", ["-source", script, fname], async (err, stdout, stderr) => {
+                temp.rmChild(fname, child);
+                temp.rm(script);
+                if (err) {
+                    vscode.window.showErrorMessage(err.message);
+                    reject(err.message);
+                } else {
+                    resolve(stdout);
+                }
+            });
+            temp.addChild(fname, child);
         });
-        temp.addChild(fname, child);
-    });
+    }
 }
