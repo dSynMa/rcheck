@@ -3,39 +3,59 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0">
     <title>R-CHECK simulator: {%=fname%}</title>
     <script type="module" src="{%= elementsUri %}"></script>
     <style>
         .scrollable-table {
             height: calc(95vh - 100px);
         }
+        .narrow-label {
+            --label-width: auto !important
+        }
+        #right-pane {
+            padding-left: 1em;
+        }
     </style>
 </head>
 
 <body>
     <h1>R-CHECK simulator: {%=fname%}</h1>
+    <vscode-split-layout minStart="70%" fixed-pane="end">
+    <div slot="start">
     <vscode-form-group>
-        <vscode-label for="select-transition">Transition:</vscode-label>
+        <vscode-label for="select-transition" class="narrow-label">Transition:</vscode-label>
         <vscode-single-select id="select-transition"></vscode-single-select>
         <vscode-button id="button-next" onclick="next()">Next</vscode-button>
         <vscode-button secondary onclick="back()">Back</vscode-button>
     </vscode-form-group>
     <vscode-divider></vscode-divider>
-    <vscode-table class="scrollable-table" zebra bordered-rows resizable columns='["10%", "90%"]' min-column-width="5px">
+    <vscode-scrollable class="scrollable-table" id="left-pane">
+    <vscode-table zebra bordered-rows resizable style="width:98%">
         <vscode-table-header slot="header">
             <vscode-table-header-cell id="header-cell">#</vscode-table-header-cell>
             <vscode-table-header-cell>State</vscode-table-header-cell>
         </vscode-table-header>
         <vscode-table-body slot="body" id="steps"></vscode-table-body>
+        <vscode-table-cell>&nbsp;</vscode-table-cell>
+        <vscode-table-cell></vscode-table-cell>
     </vscode-table>
-    <vscode-divider></vscode-divider>
+    </vscode-scrollable>
+    <!-- <vscode-divider></vscode-divider> -->
+    </div>
+    <div slot="end">
+        <vscode-scrollable class="scrollable-table" id="right-pane"></vscode-scrollable>
+    </div>
+    </vscode-split-layout>
 <script>
 const vscode = acquireVsCodeApi();
+const leftPane = document.getElementById("left-pane");
+const rightPane = document.getElementById("right-pane");
+
 const select = document.getElementById("select-transition");
-const steps = document.getElementById("steps");
 const headerCell = document.getElementById("header-cell");
 const buttonNext = document.getElementById("button-next");
+const steps = document.getElementById("steps");
 let counter = 0;
 function next() { vscode.postMessage({ command: 'next', data: select.value }); }
 function back() { vscode.postMessage({ command: 'back' }); }
@@ -45,25 +65,25 @@ function formatTransition(t) {
     const isSupplyGet = t.hasOwnProperty("___get-supply___");
     const table = document.createElement("table");
 
-    const row1 = document.createElement("tr");
-    const cell1_1 = document.createElement("td");
-    const cell1_2 = document.createElement("td");
+    const row1 = document.createElement("vscode-table-row");
+    const cell1_1 = document.createElement("vscode-table-cell");
+    const cell1_2 = document.createElement("vscode-table-cell");
     cell1_1.innerHTML = `<em>${isSupplyGet ? "Supplier" : "Sender"}: </em>`;
     cell1_2.textContent = t.sender;
     row1.appendChild(cell1_1);
     row1.appendChild(cell1_2);
     table.appendChild(row1);
-    const row2 = document.createElement("tr");
-    const cell2_1 = document.createElement("td");
-    const cell2_2 = document.createElement("td");
+    const row2 = document.createElement("vscode-table-row");
+    const cell2_1 = document.createElement("vscode-table-cell");
+    const cell2_2 = document.createElement("vscode-table-cell");
     cell2_1.innerHTML = `<em>Command: </em>`;
     cell2_2.textContent = t.send;
     row2.appendChild(cell2_1);
     row2.appendChild(cell2_2);
     table.appendChild(row2);
-    const row3 = document.createElement("tr");
-    const cell3_1 = document.createElement("td");
-    const cell3_2 = document.createElement("td");
+    const row3 = document.createElement("vscode-table-row");
+    const cell3_1 = document.createElement("vscode-table-cell");
+    const cell3_2 = document.createElement("vscode-table-cell");
     cell3_1.innerHTML = `<em>${isSupplyGet ? "Getter" : "Receivers"}: </em>`;
     cell3_2.textContent = t.receivers.join(", ");
     row3.appendChild(cell3_1);
@@ -73,13 +93,13 @@ function formatTransition(t) {
 }
 
 function formatStep(step) {
-    const table = document.createElement("table");
+    const table = document.createElement("vscode-table");
     const rows = Object.keys(step).sort().forEach(agent => {
-        const tr = document.createElement("tr");
-        const td1 = document.createElement("td");
+        const tr = document.createElement("vscode-table-row");
+        const td1 = document.createElement("vscode-table-cell");
         td1.textContent = agent + ":";
         tr.appendChild(td1);
-        const td2 = document.createElement("td");
+        const td2 = document.createElement("vscode-table-cell");
         const parts = [];
         Object.keys(step[agent]).sort().map((k) => {
             if (k === "**state**") {
@@ -95,10 +115,23 @@ function formatStep(step) {
     return table;
 }
 
+function updateSvgs(svgs) {
+    rightPane.innerHTML = "";
+    svgs.forEach((s) => {
+        const name = document.createElement("h3");
+        name.textContent = s.name;
+        const pre = document.createElement("pre");
+        pre.innerHTML = s.svg;
+        rightPane.appendChild(name);
+        rightPane.appendChild(pre);
+    });
+}
+
 window.addEventListener('message', event => {
     const message = event.data;
     switch (message.command) {
         case 'undo-step':
+            updateSvgs(message.content.svgs);
             if (steps.firstChild) { steps.removeChild(steps.lastChild); }
             if (steps.firstChild) { steps.removeChild(steps.lastChild); }
             counter -= 1;
@@ -118,13 +151,14 @@ window.addEventListener('message', event => {
             const cell2 = document.createElement("vscode-table-cell");
             counter += 1;
             cell1.textContent = counter;
-            cell1.style.width = headerCell.style.width;
+            cell1.style.width = '48px';
             const content = formatStep(message.content.state);
             cell2.appendChild(content);
             row.appendChild(cell1);
             row.appendChild(cell2);
             steps.appendChild(row);
-            row.scrollIntoView();
+            updateSvgs(message.content.svgs);
+            leftPane.scrollPos = leftPane.scrollMax;
             break;
         case 'update-transitions':
             while (select.firstChild) { select.removeChild(select.lastChild); }
