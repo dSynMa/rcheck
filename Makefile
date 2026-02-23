@@ -17,9 +17,10 @@ version = $(strip $(shell grep version package.json | tr -s ' ' | cut -d' ' -f3 
 
 build: out/extension/main.js
 
-out/extension/main.js:  $(src) $(bin) $(grammar) package.json
+out/extension/main.js:  $(src) $(bin) $(grammar) package.json fix-syntax.cjs
 	npm install
 	npm run langium:generate
+	npm run fix-syntax
 	npm run build
 
 update_submodules:
