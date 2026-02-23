@@ -75,6 +75,7 @@ fs.readFile(jsonpath, 'utf8', (err, data) => {
         ]
     }
 
+    let count = 0;
     // Careful, this can still have false positives
     oldPatterns.forEach(pattern => {
         let found = false;
@@ -85,6 +86,7 @@ fs.readFile(jsonpath, 'utf8', (err, data) => {
             }
         });
         if (!found) {
+            count++;
             console.warn(`\x1b[33m[WARNING] Pattern "${pattern}" is missing in the new patterns.\x1b[0m`);
         }
     });
@@ -112,6 +114,7 @@ fs.readFile(jsonpath, 'utf8', (err, data) => {
             console.error('Error writing file:', err);
             return;
         }
-        console.log('Syntax file updated successfully.');
+        color = count > 0 ? "\x1b[33m" : "\x1b[32m";
+        console.log(`Syntax file updated successfully ${color}[${count} missing patterns.]\x1b[0m`);;
     });
 });
