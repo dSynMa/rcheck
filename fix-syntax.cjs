@@ -31,7 +31,7 @@ fs.readFile(jsonpath, 'utf8', (err, data) => {
         },
         {
             name: "keyword.control.r-check",
-            match: "\\b(SPEC|enum|channels|property-variables|exists|false|forall|guard|init|local|message-structure|receive-guard|relabel|rep|repeat|system)\\b|\\B(-automaton-state)\\b|\\b(GET@|SUPPLY@)\\B"
+            match: "\\b(SPEC|enum|channels|property-variables|guard|init|local|message-structure|receive-guard|relabel|rep|repeat|system)\\b|\\B(-automaton-state)\\b|\\b(GET@|SUPPLY@)\\B"
         },
         {  
             match: "\\b(agent)\\b\\s+([^\\s]+)",
