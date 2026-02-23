@@ -110,7 +110,7 @@ export class SimulationPanel {
         if (response.data.hasOwnProperty("error")) {
             vscode.window.showErrorMessage(response.data.error);
         } else {
-            this.panel?.webview.postMessage({ command: 'undo-step' });
+            this.panel?.webview.postMessage({ command: 'undo-step', content: response.data });
             this.panel?.webview.postMessage({ command: 'update-transitions', content: response.data.transitions });
             this.initialized = true;
         }
