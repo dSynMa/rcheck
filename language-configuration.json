@@ -1,6 +1,8 @@
 {
     "comments": {
         // symbol used for single line comment. Remove this entry if your language does not support line comments
+        // "Incorrect type. Expected object" is a known issue, just ignore.
+        // https://github.com/microsoft/vscode-docs/issues/9210
         "lineComment": "//",
         // symbols used for start and end a block comment. Remove this entry if your language does not support block comments
         "blockComment": [ "/*", "*/" ]
