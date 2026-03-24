@@ -53,7 +53,6 @@
         "commander": "~11.0.0",
         "ejs": "^3.1.10",
         "langium": "~4.2.0",
-        "monaco-languageclient": "~9.11.0",
         "typir": "~0.3.2",
         "typir-langium": "~0.3.2",
         "vscode-languageclient": "~9.0.1",
