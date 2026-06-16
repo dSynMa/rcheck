@@ -154,5 +154,12 @@
     "main": "./out/extension/main.cjs",
     "bin": {
         "r-check-cli": "./bin/cli.js"
+    },
+    "allowScripts": {
+        "@vscode/vsce-sign@2.0.9": true,
+        "esbuild@0.25.12": true,
+        "esbuild@0.27.7": true,
+        "keytar@7.9.0": true,
+        "fsevents@2.3.3": true
     }
 }
