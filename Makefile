@@ -3,18 +3,14 @@
 all: build test package
 
 # Prefer the Node version pinned in package.json (via the volta "volta" config)
-VOLTA := $(shell command -v volta 2>/dev/null)
-ifneq ($(strip $(VOLTA)),)
-export PATH := $(dir $(VOLTA)):$(PATH)
+VOLTA_HOME ?= $(HOME)/.volta
+ifneq ($(wildcard $(VOLTA_HOME)/bin/node),)
+export PATH := $(VOLTA_HOME)/bin:$(PATH)
 endif
 
 check_node:
-	@node -e 'const m = +process.versions.node.split(".")[0]; \
-		if (m !== 24) { \
-			console.error("Error: Node 24 is required (found Node " + process.versions.node + ")."); \
-			console.error("Install volta (https://volta.sh) and run: volta install node@24"); \
-			process.exit(1); \
-		}'
+	@node --version 2>/dev/null | grep -qE '^v24\.' || \
+		{ echo "Error: Node 24 is required."; echo "Install volta (https://volta.sh) and run: volta install node@24"; exit 1; }
 
 VSCE = ./node_modules/@vscode/vsce/vsce
 
