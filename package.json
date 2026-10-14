@@ -72,8 +72,8 @@
         "vitest": "^3.2.0"
     },
     "volta": {
-        "node": "18.19.1",
-        "npm": "10.2.4"
+        "node": "24.19.0",
+        "npm": "12.0.2"
     },
     "displayName": "rcheck",
     "engines": {
