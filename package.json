@@ -73,7 +73,7 @@
     },
     "volta": {
         "node": "24.19.0",
-        "npm": "12.0.2"
+        "npm": "12.2.0"
     },
     "displayName": "rcheck",
     "engines": {
@@ -156,9 +156,9 @@
         "r-check-cli": "./bin/cli.js"
     },
     "allowScripts": {
-        "@vscode/vsce-sign@2.0.9": true,
-        "esbuild@0.28.1": true,
+        "@vscode/vsce-sign@2.1.0": true,
         "keytar@7.9.0": true,
-        "fsevents@2.3.3": true
+        "fsevents@2.3.3": true,
+        "esbuild@0.28.2": true
     }
 }
