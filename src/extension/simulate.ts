@@ -89,6 +89,25 @@ export class SimulationPanel {
         });
     }
 
+    /**
+     * The server may report its port just before the socket accepts
+     * connections. Retry briefly on connection refused instead of failing the
+     * replay with an immediate ECONNREFUSED.
+     */
+    private async requestWithRetry<T>(request: () => Promise<T>): Promise<T> {
+        const deadline = Date.now() + 5000;
+        for (; ;) {
+            try {
+                return await request();
+            } catch (error: any) {
+                const refused = error?.code === "ECONNREFUSED" ||
+                    String(error?.message ?? "").includes("ECONNREFUSED");
+                if (!refused || Date.now() >= deadline) throw error;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+    }
+
     async initPanel() {
         const jsonPath = await temp.toJson(this.rcp)
         channel.appendLine(jsonPath);
@@ -102,10 +121,13 @@ export class SimulationPanel {
             if (data.indexOf("\n") > -1) {
                 var stderrContent = Buffer.concat(stderrChunks).toString();
                 // channel.appendLine(`[DEBUG] ${stderrContent}`);
-                if (this.port == 0 && stderrContent.indexOf("PORT:") > -1) {
-                    this.port = +stderrContent.replace("PORT: ", "").trim();
-                    channel.appendLine(`[DEBUG] PORT: ${stderrContent}`);
-                    this.portWaiters.splice(0).forEach((resolve) => resolve(this.port));
+                if (this.port == 0) {
+                    const match = /(?:^|\n)PORT:\s*(\d+)/.exec(stderrContent);
+                    if (match) {
+                        this.port = Number(match[1]);
+                        channel.appendLine(`[DEBUG] PORT: ${this.port}`);
+                        this.portWaiters.splice(0).forEach((resolve) => resolve(this.port));
+                    }
                 }
             }
         });
@@ -125,10 +147,10 @@ export class SimulationPanel {
             const port = await this.waitForPort();
             const url = `http://localhost:${port}/interpretLoadJSON`;
             channel.appendLine(`[DEBUG] loading replay with ${trace.length} steps`);
-            const response = await axios.post(url, trace, {
+            const response = await this.requestWithRetry(() => axios.post(url, trace, {
                 headers: { "Content-Type": "application/json" },
                 maxBodyLength: Infinity
-            });
+            }));
             if (response.data.hasOwnProperty("error")) {
                 vscode.window.showErrorMessage(response.data.error);
                 return;
@@ -167,7 +189,7 @@ export class SimulationPanel {
         channel.appendLine("back");
         const url = `${this.serverUrl()}/interpretBack`
         channel.appendLine(`[DEBUG] ${url}`);
-        const response = await axios.get(url);
+        const response = await this.requestWithRetry(() => axios.get(url));
         channel.appendLine(`[DEBUG] ${response.status}`);
         channel.appendLine(`[DEBUG] ${JSON.stringify(response.data.state)}`);
         if (response.data.hasOwnProperty("error")) {
@@ -184,7 +206,7 @@ export class SimulationPanel {
         let url = `${this.serverUrl()}/interpretNext?reset=${!this.initialized}`;
         if (msg.data) { url = `${url}&index=${msg.data}`; }
         channel.appendLine(`[DEBUG] ${url}`);
-        const response = await axios.get(url);
+        const response = await this.requestWithRetry(() => axios.get(url));
         channel.appendLine(`[DEBUG] ${response.status}`);
         channel.appendLine(`[DEBUG] ${JSON.stringify(response.data)}`);
         if (response.data.hasOwnProperty("error")) {
