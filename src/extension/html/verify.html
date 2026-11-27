@@ -12,5 +12,11 @@
     <p>{%= subtitle %}</p>
     {% if (body != undefined) { %}{%- body %}
     {% } else { %}<vscode-icon name="loading" spin spin-duration="1" size="48"></vscode-icon>{% } %}
+<script>
+    const vscode = acquireVsCodeApi();
+    function openSimulator(index) {
+        vscode.postMessage({ command: "open-simulator", index: index });
+    }
+</script>
 </body>
 </html>

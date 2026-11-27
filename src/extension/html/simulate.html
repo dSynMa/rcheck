@@ -127,6 +127,57 @@ function updateSvgs(svgs) {
     });
 }
 
+function appendTransition(transition) {
+    const row = document.createElement("vscode-table-row");
+    row.appendChild(document.createElement("vscode-table-cell"));
+    const cell = document.createElement("vscode-table-cell");
+    cell.appendChild(formatTransition(transition));
+    row.appendChild(cell);
+    steps.appendChild(row);
+}
+
+function appendState(state) {
+    const row = document.createElement("vscode-table-row");
+    const cell1 = document.createElement("vscode-table-cell");
+    const cell2 = document.createElement("vscode-table-cell");
+    counter += 1;
+    cell1.textContent = counter;
+    cell1.style.width = '48px';
+    cell2.appendChild(formatStep(state));
+    row.appendChild(cell1);
+    row.appendChild(cell2);
+    steps.appendChild(row);
+}
+
+function appendStep(content) {
+    if (content.inboundTransition) appendTransition(content.inboundTransition);
+    appendState(content.state);
+}
+
+function updateTransitions(transitions) {
+    while (select.firstChild) { select.removeChild(select.lastChild); }
+    if (transitions.length === 0) {
+        const option = document.createElement("vscode-option");
+        option.setAttribute("value", -1);
+        option.textContent = "No available transitions";
+        select.appendChild(option);
+        select.value = -1;
+        select.disabled = true;
+        buttonNext.disabled = true;
+        return;
+    }
+    select.disabled = false;
+    buttonNext.disabled = false;
+    for (let index = 0; index < transitions.length; index++) {
+        const element = transitions[index];
+        const option = document.createElement("vscode-option");
+        option.setAttribute("description", element.send);
+        option.setAttribute("value", index);
+        option.textContent = element.sender + '-> {' + element.receivers.join(", ") + '}';
+        select.appendChild(option);
+    }
+}
+
 window.addEventListener('message', event => {
     const message = event.data;
     switch (message.command) {
@@ -137,54 +188,25 @@ window.addEventListener('message', event => {
             counter -= 1;
             break;
         case 'append-step':
-            if (message.content.hasOwnProperty("inboundTransition")) {
-                const row = document.createElement("vscode-table-row");
-                row.appendChild(document.createElement("vscode-table-cell"));
-                const cell = document.createElement("vscode-table-cell");
-                const content = formatTransition(message.content.inboundTransition);
-                cell.appendChild(content)
-                row.appendChild(cell);
-                steps.appendChild(row);
-            }
-            const row = document.createElement("vscode-table-row");
-            const cell1 = document.createElement("vscode-table-cell");
-            const cell2 = document.createElement("vscode-table-cell");
-            counter += 1;
-            cell1.textContent = counter;
-            cell1.style.width = '48px';
-            const content = formatStep(message.content.state);
-            cell2.appendChild(content);
-            row.appendChild(cell1);
-            row.appendChild(cell2);
-            steps.appendChild(row);
+            appendStep(message.content);
             updateSvgs(message.content.svgs);
             leftPane.scrollPos = leftPane.scrollMax;
             break;
+        case 'load-trace':
+            steps.innerHTML = "";
+            counter = 0;
+            (message.content.trace || []).forEach(appendStep);
+            updateTransitions(message.content.transitions || []);
+            updateSvgs(message.content.svgs || []);
+            leftPane.scrollPos = leftPane.scrollMax;
+            break;
         case 'update-transitions':
-            while (select.firstChild) { select.removeChild(select.lastChild); }
-            if (message.content.length === 0) {
-                const option = document.createElement("vscode-option");
-                option.setAttribute("value", -1);
-                option.textContent = "No available transitions";
-                select.appendChild(option);
-                select.value = -1;
-                select.disabled = true;
-                buttonNext.disabled = true;
-                break;
-            }
-            select.disabled = false;
-            buttonNext.disabled = false;
-            for (let index = 0; index < message.content.length; index++) {
-                const element = message.content[index];
-                const option = document.createElement("vscode-option");
-                option.setAttribute("description", element.send)
-                option.setAttribute("value", index);
-                option.textContent = element.sender + '-> {' + element.receivers.join(", ") + '}';
-                select.appendChild(option);
-            }
+            updateTransitions(message.content);
             break;
     }
 });
+
+vscode.postMessage({ command: 'ready' });
 </script>
 </body>
 
