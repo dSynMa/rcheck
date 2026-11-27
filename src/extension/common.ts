@@ -46,6 +46,15 @@ export function spawnJar(args: string[]) {
     return spawn("java", args_);
 }
 
+/**
+ * nuXmv executable used for verification. RCHECK_NUXMV overrides the command;
+ * otherwise the system PATH is searched.
+ */
+export function nuxmvCommand(): string {
+    const override = process.env.RCHECK_NUXMV;
+    return override && override.trim() ? override.trim() : "nuxmv";
+}
+
 ejs.openDelimiter = "{"
 ejs.closeDelimiter = "}"
 
