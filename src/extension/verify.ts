@@ -106,6 +106,29 @@ async function findSpecs(value: ExecResult) {
     return Promise.all([Promise.resolve(smvFile), execPromise("grep", ["-B", "1", "^LTLSPEC", smvFile])]);
 }
 
+/**
+ * Split grep output into the original property (when the SMV includes it as a
+ * comment) and the translated LTL formula passed to nuXmv.
+ */
+export function parseSpecs(grepOutput: string): Array<{ display: string, formula: string }> {
+    const specs: Array<{ display: string, formula: string }> = [];
+    let comment = "";
+    for (const line of grepOutput.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("LTLSPEC")) {
+            const formula = trimmed.slice("LTLSPEC".length).trim();
+            specs.push({ display: comment || formula, formula });
+            comment = "";
+        } else if (trimmed.startsWith("--") && trimmed !== "--") {
+            comment = trimmed.slice(2).trim();
+        } else {
+            // Context from the model itself (e.g. the TRANS line), not a property comment.
+            comment = "";
+        }
+    }
+    return specs;
+}
+
 async function verifySpecsIc3(fname: string, json: string, v: [string, ExecResult]) {
     verifySpecs(fname, json, ic3, v, "IC3");
 }
@@ -140,17 +163,22 @@ async function verifySpecs(fname: string, json: string, fn: Function, v: [string
         panel.webview);
     panel.webview.html = tmpHtml;
 
-    const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
+    const specs = parseSpecs(v[1].stdout);
     channel.show();
     channel.appendLine(`[${fname}] Model checking started...`);
 
+    if (specs.length === 0) {
+        const message = `No LTL specifications found for ${fname}.`;
+        channel.appendLine(message);
+        vscode.window.showWarningMessage(message);
+    }
+
     let count = 0;
     const body = await Promise
-        .all(specs.map(async (element, index) => {
-            const split = element.split("LTLSPEC").map((x) => x.trim());
-            const nuxmvOutput = await fn(v[0], index, split[1]);
+        .all(specs.map(async ({ display, formula }, index) => {
+            const nuxmvOutput = await fn(v[0], index, formula);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
-            return formatNuXmvOutput(split[0], json, nuxmvOutput, index, (trace) => traces.set(index, trace));
+            return formatNuXmvOutput(display, json, nuxmvOutput, index, (trace) => traces.set(index, trace));
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
