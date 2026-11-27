@@ -113,10 +113,13 @@ export class SimulationPanel {
         channel.appendLine(jsonPath);
         if (this.server && !this.server.killed) this.killServer();
         this.port = 0;
-        this.server = spawnJar(["-j", jsonPath, "-a", "-p", "0"]);
-        temp.addChild(`simulator: ${this.rcp}`, this.server);
+        const server = spawnJar(["-j", jsonPath, "-a", "-p", "0"]);
+        this.server = server;
+        temp.addChild(`simulator: ${this.rcp}`, server);
         let stderrChunks: any[] = [];
-        this.server.stderr?.on('data', (data) => {
+        server.stderr?.on('data', (data) => {
+            // Ignore output from a server that has already been replaced.
+            if (this.server !== server) return;
             stderrChunks = stderrChunks.concat(data);
             if (data.indexOf("\n") > -1) {
                 var stderrContent = Buffer.concat(stderrChunks).toString();
@@ -129,6 +132,11 @@ export class SimulationPanel {
                         this.portWaiters.splice(0).forEach((resolve) => resolve(this.port));
                     }
                 }
+            }
+        });
+        server.on('exit', (code, signal) => {
+            if (this.server === server) {
+                channel.appendLine(`[DEBUG] Simulation server exited (code ${code}, signal ${signal})`);
             }
         });
 
