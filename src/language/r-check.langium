@@ -94,24 +94,33 @@ MsgStruct: TypedDeclaration;
 PropVar: TypedDeclaration;
 
 CompoundExpr:
-    AddSub;
+    Implication;
 
-Logical infers CompoundExpr:
-    Comparison ({infer BinExpr.left=current} operator=('&'|'|'|'->'|'U'|'R'|'W') right=Comparison)*;
+Implication infers CompoundExpr:
+    Until ({infer BinExpr.left=current} operator='->' right=Implication)?;
+
+Until infers CompoundExpr:
+    OrExpr ({infer BinExpr.left=current} operator=('U'|'R'|'W') right=OrExpr)*;
+
+OrExpr infers CompoundExpr:
+    AndExpr ({infer BinExpr.left=current} operator='|' right=AndExpr)*;
+
+AndExpr infers CompoundExpr:
+    Comparison ({infer BinExpr.left=current} operator='&' right=Comparison)*;
 
 Comparison infers CompoundExpr:
-    BaseExpr ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=BaseExpr)?;
+    AddSub ({infer BinExpr.left=current} operator=('<'|'<='|'>'|'>='|'='|'!='|'==') right=AddSub)?;
 
 AddSub infers CompoundExpr:
     MulDiv ({infer BinExpr.left=current} operator=('+' | '-') right=MulDiv)*;
 
 MulDiv infers CompoundExpr:
-    Logical ({infer BinExpr.left=current} operator=('*' | '/') right=Logical)*;
+    BaseExpr ({infer BinExpr.left=current} operator=('*' | '/') right=BaseExpr)*;
 
 type Qualifier = Instance | LtolQuant;
 
 BaseExpr infers CompoundExpr:
-    '(' AddSub ')'
+    '(' CompoundExpr ')'
     | {infer AutomatonState} instance=[Instance] '-automaton-state'
     | {infer QualifiedRef} instance=[Qualifier] '-' variable=[Target]
     | {infer Ref} variable=[Target]
@@ -143,9 +152,19 @@ LtolBase infers Ltol:
     | {infer Box} '[[' obs=Obs ']]' expr=CompoundExpr
     ;
 
-Obs: CompoundObs;
-CompoundObs infers Obs:
-    BaseObs ({infer BinObs.left=current} operator=('&'|'|'|'->'|'<->') right=BaseObs)*;
+Obs: IffObs;
+
+IffObs infers Obs:
+    ImpObs ({infer BinObs.left=current} operator='<->' right=IffObs)?;
+
+ImpObs infers Obs:
+    OrObs ({infer BinObs.left=current} operator='->' right=ImpObs)?;
+
+OrObs infers Obs:
+    AndObs ({infer BinObs.left=current} operator='|' right=AndObs)*;
+
+AndObs infers Obs:
+    BaseObs ({infer BinObs.left=current} operator='&' right=BaseObs)*;
 
 BaseObs : LiteralObs | ChannelObs | SenderObs | GetterObs | ForallObs | ExistsObs;
 LiteralObs: value=('true'|'false'|'p2p');

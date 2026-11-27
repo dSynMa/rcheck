@@ -1,9 +1,10 @@
 import { execFile } from "child_process";
 import * as vscode from "vscode";
 import { Temp } from "./temp.js";
-import { writeFileSync } from "node:fs";
+import { accessSync, constants as fsConstants, writeFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { integer } from "vscode-languageserver";
-import { execPromise, ExecResult, getCurrentRcpFile, readPromise, renderTemplate, runJar, writePromise } from "./common.js";
+import { execPromise, ExecResult, getCurrentRcpFile, nuxmvCommand, readPromise, renderTemplate, runJar, writePromise } from "./common.js";
 import { renderStep, Step } from "./cex.js";
 
 let temp: Temp
@@ -77,9 +78,20 @@ async function showSmv(content: string) {
 }
 
 async function check() {
+    const executable = nuxmvCommand();
     return new Promise<void>((resolve, reject) => {
-        execFile("which", ["nuxmv"], (err, _) => {
-            if (err) { reject("This command requires nuxmv.") }
+        if (isAbsolute(executable)) {
+            try {
+                accessSync(executable, fsConstants.X_OK);
+                resolve();
+            } catch {
+                reject(`This command requires nuxmv (tried ${executable}).`);
+            }
+            return;
+        }
+        const finder = process.platform === "win32" ? "where" : "which";
+        execFile(finder, [executable], (err, _) => {
+            if (err) { reject(`This command requires nuxmv (tried ${executable}).`) }
             else resolve();
         });
     });
@@ -211,7 +223,7 @@ function ic3(fname: string, index: integer, spec: string, build_boolean_model: b
 
     return new Promise<string>((resolve, reject) => {
         writeFileSync(script, smvCommands);
-        const child = execFile("nuxmv", ["-source", script, fname], async (err, stdout, stderr) => {
+        const child = execFile(nuxmvCommand(), ["-source", script, fname], async (err, stdout, stderr) => {
             temp.rmChild(fname, child);
             temp.rm(script);
             if (err) {
@@ -265,7 +277,7 @@ function makeBmcFn(bound: integer) {
 
         return new Promise<string>((resolve, reject) => {
             writeFileSync(script, smvCommands);
-            const child = execFile("nuxmv", ["-source", script, fname], async (err, stdout, stderr) => {
+            const child = execFile(nuxmvCommand(), ["-source", script, fname], async (err, stdout, stderr) => {
                 temp.rmChild(fname, child);
                 temp.rm(script);
                 if (err) {
