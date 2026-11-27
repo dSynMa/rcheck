@@ -106,6 +106,29 @@ async function findSpecs(value: ExecResult) {
     return Promise.all([Promise.resolve(smvFile), execPromise("grep", ["-B", "1", "^LTLSPEC", smvFile])]);
 }
 
+/**
+ * Split grep output into the original property (when the SMV includes it as a
+ * comment) and the translated LTL formula passed to nuXmv.
+ */
+export function parseSpecs(grepOutput: string): Array<{ display: string, formula: string }> {
+    const specs: Array<{ display: string, formula: string }> = [];
+    let comment = "";
+    for (const line of grepOutput.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("LTLSPEC")) {
+            const formula = trimmed.slice("LTLSPEC".length).trim();
+            specs.push({ display: comment || formula, formula });
+            comment = "";
+        } else if (trimmed.startsWith("--") && trimmed !== "--") {
+            comment = trimmed.slice(2).trim();
+        } else {
+            // Context from the model itself (e.g. the TRANS line), not a property comment.
+            comment = "";
+        }
+    }
+    return specs;
+}
+
 async function verifySpecsIc3(fname: string, json: string, v: [string, ExecResult]) {
     verifySpecs(fname, json, ic3, v, "IC3");
 }
@@ -120,6 +143,17 @@ async function verifySpecs(fname: string, json: string, fn: Function, v: [string
         vscode.ViewColumn.Active,
         { enableScripts: true, retainContextWhenHidden: true }
     );
+    const traces = new Map<number, Step[]>();
+    panel.webview.onDidReceiveMessage(async (message) => {
+        if (message.command !== "open-simulator") return;
+        const trace = traces.get(message.index);
+        if (trace) {
+            await vscode.commands.executeCommand("rcheck.simulate", {
+                rcpPath: fname,
+                trace
+            });
+        }
+    });
     const tmpHtml = await renderTemplate(
         ctx, "verify.html", {
         fname: fname,
@@ -129,17 +163,22 @@ async function verifySpecs(fname: string, json: string, fn: Function, v: [string
         panel.webview);
     panel.webview.html = tmpHtml;
 
-    const specs = v[1].stdout.trim().replace("\n", "").split("--").slice(1)
+    const specs = parseSpecs(v[1].stdout);
     channel.show();
     channel.appendLine(`[${fname}] Model checking started...`);
 
+    if (specs.length === 0) {
+        const message = `No LTL specifications found for ${fname}.`;
+        channel.appendLine(message);
+        vscode.window.showWarningMessage(message);
+    }
+
     let count = 0;
     const body = await Promise
-        .all(specs.map(async (element, index) => {
-            const split = element.split("LTLSPEC").map((x) => x.trim());
-            const nuxmvOutput = await fn(v[0], index, split[1]);
+        .all(specs.map(async ({ display, formula }, index) => {
+            const nuxmvOutput = await fn(v[0], index, formula);
             channel.appendLine(`[${fname}] ${++count}/${specs.length} done...`)
-            return formatNuXmvOutput(split[0], json, nuxmvOutput);
+            return formatNuXmvOutput(display, json, nuxmvOutput, index, (trace) => traces.set(index, trace));
         }))
         .then(outputs => {
             channel.appendLine(`[${fname}] Done.`);
@@ -154,7 +193,7 @@ async function verifySpecs(fname: string, json: string, fn: Function, v: [string
         panel.webview);
 }
 
-async function formatNuXmvOutput(spec: string, json: string, out: string) {
+async function formatNuXmvOutput(spec: string, json: string, out: string, index: number, registerTrace: (trace: Step[]) => void) {
     const isTrue = out.indexOf("is true") > -1;
     const isFalse = out.indexOf("is false") > -1;
 
@@ -171,20 +210,23 @@ async function formatNuXmvOutput(spec: string, json: string, out: string) {
         table = await writePromise(cexFile, out)
             .then(() => runJar(["-j", json, "-cex", cexFile]))
             .then(v => JSON.parse(v.stdout), channel.appendLine)
-            .then((cex: Step[]) => cex.map(async s => {
-                const render = await renderTemplate(
-                    ctx, "_step.html",
-                    {
-                        deadlock: s.___DEADLOCK___,
-                        depth: s.depth,
-                        isSupplyGet: s.inboundTransition?.hasOwnProperty("___get-supply___"),
-                        loop: s.___LOOP___ && !s.___DEADLOCK___,
-                        step: renderStep(cex, s),
-                        transition: s.inboundTransition
-                    },
-                    panel.webview);
-                return render;
-            }))
+            .then((cex: Step[]) => {
+                registerTrace(cex);
+                return cex.map(async s => {
+                    const render = await renderTemplate(
+                        ctx, "_step.html",
+                        {
+                            deadlock: s.___DEADLOCK___,
+                            depth: s.depth,
+                            isSupplyGet: s.inboundTransition?.hasOwnProperty("___get-supply___"),
+                            loop: s.___LOOP___ && !s.___DEADLOCK___,
+                            step: renderStep(cex, s),
+                            transition: s.inboundTransition
+                        },
+                        panel.webview);
+                    return render;
+                });
+            })
             .then(outputs => Promise.all(outputs))
             .catch((e) => {
                 channel.appendLine(e);
@@ -199,6 +241,7 @@ async function formatNuXmvOutput(spec: string, json: string, out: string) {
             spec: spec,
             isTrue: isTrue,
             isFalse: isFalse,
+            index: index,
             output: lines.join("\n")
         }, panel.webview);
     return render;

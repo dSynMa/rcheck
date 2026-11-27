@@ -4,6 +4,10 @@
 {% } else { %} ❔ {% } %}
 </h2>
 
+{% if (isFalse) { %}
+<p><vscode-button onclick="openSimulator({%= index %})">Replay in simulator</vscode-button></p>
+{% } %}
+
 {% if (tbody) { %}
 <vscode-table zebra bordered-rows resizable columns='["10%", "90%"]' min-column-width="5px">
 <vscode-table-header slot="header">
